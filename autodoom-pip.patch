@@ -1,0 +1,361 @@
+diff --git a/source/d_main.cpp b/source/d_main.cpp
+index 88b20bf..1a6e893 100644
+--- a/source/d_main.cpp
++++ b/source/d_main.cpp
+@@ -571,6 +571,94 @@ void D_DrawWings()
+    }
+ }
+ 
++//
++// D_drawPipView
++//
++// Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
++// principal e antes do HUD, que fica por cima de proposito.
++//
++static void D_drawPipView()
++{
++   if(!pip_active || gamestate != GS_LEVEL || automapactive)
++      return;
++
++   // Ranking por fragos/mortes: quem mais mata aparece primeiro. E o criterio
++   // automatico; o F12 empresta o lugar por 10 segundos e depois devolve.
++   int order[MAXPLAYERS];
++   int count = 0;
++
++   for(int i = 0; i < MAXPLAYERS; i++)
++   {
++      if(playeringame[i] && i != displayplayer && players[i].mo)
++         order[count++] = i;
++   }
++
++   if(!count)
++      return;
++
++   for(int a = 0; a < count - 1; a++)
++   {
++      for(int b = a + 1; b < count; b++)
++      {
++         if(players[order[b]].killcount > players[order[a]].killcount)
++         {
++            const int swap = order[a];
++            order[a] = order[b];
++            order[b] = swap;
++         }
++      }
++   }
++
++   // Escolha manual do F12 vale enquanto o prazo nao vence, e so no primeiro
++   // quadrinho -- os outros seguem o ranking.
++   if(gametic < pip_manual_until && pip_player >= 0 && pip_player < MAXPLAYERS &&
++      playeringame[pip_player] && pip_player != displayplayer)
++   {
++      for(int i = 0; i < count; i++)
++      {
++         if(order[i] == pip_player)
++         {
++            const int swap = order[0];
++            order[0] = order[i];
++            order[i] = swap;
++            break;
++         }
++      }
++   }
++   else if(gametic >= pip_manual_until)
++      pip_player = order[0];   // volta sozinho para quem mais mata
++
++   int boxes = pip_count;
++   if(boxes > count)
++      boxes = count;
++   if(boxes < 1)
++      boxes = 1;
++
++   const int margin = video.width / 64;
++   int w = video.width  * pip_size / 100;
++   int h = video.height * pip_size / 100;
++   w &= ~1;
++   h &= ~1;
++
++   // Nao deixa a fila estourar a largura da tela.
++   while(boxes > 1 && margin + boxes * (w + margin) > video.width)
++      boxes--;
++
++   const int y = pip_bottom ? video.height - h - margin : margin;
++
++   for(int n = 0; n < boxes; n++)
++   {
++      const int x = margin + n * (w + margin);   // sempre da esquerda para a direita
++
++      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, w + 2, 1);
++      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y + h,  w + 2, 1);
++      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, 1, h + 2);
++      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x + w,  y - 1, 1, h + 2);
++
++      R_RenderPipView(&players[order[n]], x, y, w, h);
++   }
++}
++
+ //
+ // D_Display
+ //  draw current display, possibly wiping it from the previous
+@@ -617,6 +705,7 @@ static void D_Display()
+          {
+             R_DrawViewBorder();    // redraw border
+             R_RenderPlayerView(&players[displayplayer], camera);
++            D_drawPipView();          // PIP: visao de outro jogador no canto
+          }
+          
+          ST_Drawer(scaledwindow.height == SCREENHEIGHT);  // killough 11/98
+@@ -1722,6 +1811,10 @@ static void D_DoomInit()
+    if((p = M_CheckParm("-bots")) && p < myargc - 1)
+       netbot = atoi(myargv[p + 1]);
+ 
++   // PIP: liga o quadrinho com a visao de outro jogador
++   if(M_CheckParm("-pip"))
++      pip_active = 1;
++
+    if((netgame || M_CheckParm("-solo-net") || netbot) &&
+       GameType == gt_single)
+    {
+diff --git a/source/g_cmd.cpp b/source/g_cmd.cpp
+index d1a56c4..a247293 100644
+--- a/source/g_cmd.cpp
++++ b/source/g_cmd.cpp
+@@ -42,6 +42,7 @@
+ #include "e_player.h" // haleyjd: turbo cmd must alter playerclass info
+ #include "f_wipe.h"
+ #include "g_game.h"
++#include "r_main.h"
+ #include "hal/i_timer.h"
+ #include "hu_stuff.h"
+ #include "i_system.h"
+@@ -635,11 +636,30 @@ CONSOLE_COMMAND(spectate_prev, 0)
+ 
+ CONSOLE_COMMAND(spectate_next, 0)
+ {
+-   int i = displayplayer + 1;
+-
+    if((gamestate != GS_LEVEL) || ((!demoplayback) && (GameType == gt_dm)))
+       return;
+ 
++   // Com o PIP ligado a tecla passa a girar quem aparece no quadrinho, e a
++   // tela grande continua sendo a sua.
++   if(pip_active)
++   {
++      int start = (pip_player < 0 || pip_player >= MAXPLAYERS) ? displayplayer : pip_player;
++      for(int n = 1; n <= MAXPLAYERS; n++)
++      {
++         int i = (start + n) % MAXPLAYERS;
++         if(playeringame[i] && i != displayplayer)
++         {
++            pip_player = i;
++            // 10 segundos de escolha manual; depois volta para quem mais mata
++            pip_manual_until = gametic + 10 * TICRATE;
++            return;
++         }
++      }
++      return;
++   }
++
++   int i = displayplayer + 1;
++
+    for(; i != displayplayer; i++)
+    {
+       if(i >= MAXPLAYERS)
+diff --git a/source/hu_frags.cpp b/source/hu_frags.cpp
+index 27eebb8..5e66f9e 100644
+--- a/source/hu_frags.cpp
++++ b/source/hu_frags.cpp
+@@ -82,10 +82,19 @@ void HU_FragsDrawer(void)
+    if(!show_scores)
+       return;
+ 
++   // O placar valia so em deathmatch. No Coop com bots a informacao util e
++   // quem esta matando mais, entao ele passa a valer aqui tambem -- e a coluna
++   // mostra abates em vez de frags.
+    if(((players[displayplayer].playerstate != PST_DEAD || walkcam_active)
+-      && !hu_showfrags) || GameType != gt_dm || automapactive)
++      && !hu_showfrags) || GameType == gt_single || automapactive)
+       return;
+ 
++   // Fora do deathmatch nada dispara HU_FragsUpdate (frag e que chama, em
++   // p_inter.cpp:983), entao a ordem por abates chegava velha aqui. Sao no
++   // maximo 4 jogadores: reordenar a cada desenho e barato.
++   if(GameType != gt_dm)
++      HU_FragsUpdate();
++
+    // "frags"
+ 
+    // haleyjd 04/08/10: draw more intelligently
+@@ -117,7 +126,9 @@ void HU_FragsDrawer(void)
+                             translationtables[(sortedplayers[i]->colormap - 1)] :
+                             nullptr, false);
+       // draw the frags
+-      psnprintf(tempstr, sizeof(tempstr), "%i", sortedplayers[i]->totalfrags);
++      psnprintf(tempstr, sizeof(tempstr), "%i",
++                GameType == gt_dm ? sortedplayers[i]->totalfrags
++                                  : sortedplayers[i]->killcount);
+       V_FontWriteText(hud_font, tempstr, 
+                       FRAGNUMX + 16 - V_FontStringWidth(hud_font, tempstr)/2, y,
+                       &subscreen43);
+@@ -163,8 +174,12 @@ void HU_FragsUpdate(void)
+       change = false;
+       for(i=0; i<num_players-1; i++)
+       {
+-         if(sortedplayers[i]->totalfrags <
+-            sortedplayers[i+1]->totalfrags)
++         const int a = GameType == gt_dm ? sortedplayers[i]->totalfrags
++                                         : sortedplayers[i]->killcount;
++         const int b = GameType == gt_dm ? sortedplayers[i+1]->totalfrags
++                                         : sortedplayers[i+1]->killcount;
++
++         if(a < b)
+          {
+             temp = sortedplayers[i];
+             sortedplayers[i] = sortedplayers[i+1];
+diff --git a/source/m_misc.cpp b/source/m_misc.cpp
+index 6213b63..220ef4d 100644
+--- a/source/m_misc.cpp
++++ b/source/m_misc.cpp
+@@ -463,6 +463,19 @@ default_t defaults[] =
+    DEFAULT_INT("comp_aircontrol", &default_comp[comp_aircontrol], &comp[comp_aircontrol],
+                1, 0, 1, default_t::wad_yes, "Disable jumping for DOOM/Heretic"),
+ 
++   // PIP: visao de outro jogador num quadrinho no canto
++   DEFAULT_INT("pip", &pip_active, nullptr, 0, 0, 1, default_t::wad_no,
++               "1 to show another player's view in a corner box"),
++
++   DEFAULT_INT("pip_size", &pip_size, nullptr, 25, 10, 50, default_t::wad_no,
++               "PIP box size as a percentage of the screen"),
++
++   DEFAULT_INT("pip_bottom", &pip_bottom, nullptr, 0, 0, 1, default_t::wad_no,
++               "PIP row: 0=top of the screen, 1=bottom"),
++
++   DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
++               "How many PIP boxes to show, left to right"),
++
+    // For key bindings, the values stored in the key_* variables       // phares
+    // are the internal Doom Codes. The values stored in the default.cfg
+    // file are the keyboard codes. I_ScanCode2DoomCode converts from
+diff --git a/source/r_main.cpp b/source/r_main.cpp
+index 2ec797b..aaacdd0 100644
+--- a/source/r_main.cpp
++++ b/source/r_main.cpp
+@@ -1217,6 +1217,73 @@ extern void R_UntaintPortals();
+ //
+ // Primary renderer entry point.
+ //
++//
++// PIP -- picture-in-picture: a visao de outro jogador num quadrinho no canto.
++//
++// Funciona porque R_RenderPlayerView limpa todos os buffers dele na entrada
++// (clip segs, draw segs, planos, portais, sprites), entao chamar duas vezes no
++// mesmo quadro e seguro. O que precisa de cuidado e a geometria: viewwindow,
++// os centros, o struct view e a tabela de altura por coluna. Tudo isso e
++// salvo, trocado pelo retangulo do PIP e devolvido no fim.
++//
++int pip_active = 0;   // liga/desliga
++int pip_size   = 25;  // porcentagem da tela, por quadrinho
++int pip_bottom = 0;   // 0 = fila em cima, 1 = fila embaixo
++int pip_count  = 1;   // quantos quadrinhos, da esquerda para a direita
++int pip_player = -1;  // escolhido a mao pelo F12; -1 = automatico
++int pip_manual_until = 0; // ate que gametic a escolha manual manda
++
++void R_RenderPipView(player_t *player, int x, int y, int w, int h)
++{
++   if(!player || !player->mo || w < 32 || h < 32)
++      return;
++
++   const rrect_t   savedWindow  = viewwindow;
++   const cb_view_t savedView    = view;
++   const int       savedCenterX = centerx;
++   const int       savedCenterY = centery;
++   const fixed_t   savedCXFrac  = centerxfrac;
++   const fixed_t   savedCYFrac  = centeryfrac;
++
++   viewwindow.x      = x;
++   viewwindow.y      = y;
++   viewwindow.width  = w;
++   viewwindow.height = h;
++
++   centerx     = w / 2;
++   centery     = h / 2;
++   centerxfrac = centerx << FRACBITS;
++   centeryfrac = centery << FRACBITS;
++
++   view.xcenter = (view.width  = (float)w) * 0.5f;
++   view.ycenter = (view.height = (float)h) * 0.5f;
++
++   // A arma do outro jogador tem que encolher junto, senao vira um canhao
++   // ocupando o quadrinho inteiro.
++   const float shrinkX = (float)w / (float)savedWindow.width;
++   const float shrinkY = (float)h / (float)savedWindow.height;
++   view.pspritexscale *= shrinkX;
++   view.pspriteyscale *= shrinkY;
++   view.pspriteystep   = 1.0f / view.pspriteyscale;
++
++   R_InitTextureMapping();
++   for(int i = 0; i < w; i++)
++      screenheightarray[i] = view.height - 1.0f;
++
++   R_RenderPlayerView(player, nullptr);
++
++   viewwindow  = savedWindow;
++   view        = savedView;
++   centerx     = savedCenterX;
++   centery     = savedCenterY;
++   centerxfrac = savedCXFrac;
++   centeryfrac = savedCYFrac;
++
++   R_InitTextureMapping();
++   for(int i = 0; i < viewwindow.width; i++)
++      screenheightarray[i] = view.height - 1.0f;
++}
++
+ void R_RenderPlayerView(player_t* player, camera_t *camerapoint)
+ {
+    bool quake = false;
+@@ -1481,6 +1548,12 @@ VARIABLE_TOGGLE(r_boomcolormaps, nullptr,           onoff);
+ // SoM: Variable FOV
+ VARIABLE_INT(fov, nullptr, 20, 179, nullptr);
+ 
++// PIP
++VARIABLE_INT(pip_active, nullptr, 0,  1,  nullptr);
++VARIABLE_INT(pip_size,   nullptr, 10, 50, nullptr);
++VARIABLE_INT(pip_bottom, nullptr, 0,  1,  nullptr);
++VARIABLE_INT(pip_count,  nullptr, 1,  3,  nullptr);
++
+ // SoM: Portal tainted
+ VARIABLE_BOOLEAN(showtainted, nullptr,              onoff);
+ 
+@@ -1499,6 +1572,11 @@ CONSOLE_VARIABLE(r_fov, fov, 0)
+ 
+ CONSOLE_VARIABLE(r_showrefused, showtainted, 0) {}
+ 
++CONSOLE_VARIABLE(pip, pip_active, 0) {}
++CONSOLE_VARIABLE(pip_size, pip_size, 0) {}
++CONSOLE_VARIABLE(pip_bottom, pip_bottom, 0) {}
++CONSOLE_VARIABLE(pip_count, pip_count, 0) {}
++
+ CONSOLE_VARIABLE(gamma, usegamma, 0)
+ {
+    const char *msg;
+diff --git a/source/r_main.h b/source/r_main.h
+index 46fa338..905b493 100644
+--- a/source/r_main.h
++++ b/source/r_main.h
+@@ -119,6 +119,15 @@ struct player_t;
+ 
+ void R_RenderPlayerView(player_t *player, camera_t *viewcamera);
+ 
++// PIP: segunda visao, num retangulo qualquer da tela
++void R_RenderPipView(player_t *player, int x, int y, int w, int h);
++extern int pip_active;
++extern int pip_size;
++extern int pip_bottom;
++extern int pip_count;
++extern int pip_player;
++extern int pip_manual_until;
++
+ //
+ // R_ResetFOV
+ // 

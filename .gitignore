@@ -1,0 +1,2 @@
+# binarios grandes vao para a Release, nao para o historico
+*.exe
