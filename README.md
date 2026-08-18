@@ -1,101 +1,143 @@
+<div align="center">
+
 # AutoDoom PIP + Launcher
 
-> Picture-in-picture and a friendly launcher for [AutoDoom](https://github.com/ioan-chera/AutoDoom),
-> Ioan Chera's fork of the [Eternity Engine](https://github.com/team-eternity/eternity) with a
-> pathfinding bot.
+**Picture-in-picture and a friendly launcher for [AutoDoom](https://github.com/ioan-chera/AutoDoom) — Ioan Chera's Eternity Engine fork with a pathfinding bot.**
 
-**[English](#english) · [Português](#português)**
+[![Release](https://img.shields.io/github/v/release/LightWolfMan/autodoom-pip?label=release)](https://github.com/LightWolfMan/autodoom-pip/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/LightWolfMan/autodoom-pip/total)](https://github.com/LightWolfMan/autodoom-pip/releases)
+[![Engine](https://img.shields.io/badge/engine-GPL--3.0-blue)](COPYING-GPLv3)
+[![Launcher](https://img.shields.io/badge/launcher-MIT-green)](LICENSE-launcher.md)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](#requirements)
 
-![The PIP box showing a bot's view](docs/pip.png)
+**English** · [Português](#português)
+
+<img src="docs/pip.png" alt="AutoDoom with the picture-in-picture box in the top-left corner, showing another bot's view" width="820">
+
+</div>
 
 ---
 
-## English
-
-Watching a bot play is more fun when you can see what *it* sees. This adds a corner box with
-another player's view, rendered in the same frame as your own, plus a launcher that ties the
+Watching a bot play is more fun when you can see what *it* sees. This project adds a corner box
+rendering another player's view **in the same frame** as your own, plus a launcher that ties the
 loose ends of running AutoDoom together.
 
-### What's in the box
+## Table of contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Building from source](#building-from-source)
+- [How it works](#how-it-works)
+- [Known limitations](#known-limitations)
+- [Contributing](#contributing)
+- [Licence](#licence)
+- [Credits](#credits)
+
+## Features
+
+- **Picture-in-picture** — one to three corner boxes with other players' views, rendered in the
+  same frame. Off by default.
+- **Follows the leader** — with a single box it tracks whoever has the most kills. `F12` borrows
+  the box for ten seconds, then it goes back on its own.
+- **Launcher** — IWAD and PWAD pickers, Copilot and Co-op modes, bot count, and a WAD finder
+  that reads the NTFS journal instead of walking the disk.
+- **Co-op scoreboard** — hold `F` for a ranking by kills. Eternity's scoreboard was deathmatch
+  only; a small patch opens it up.
+- **Bilingual** — the launcher follows your Windows language (English or Portuguese).
+- **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
+
+<img src="docs/launcher-en.png" alt="The AutoDoom Launcher window" width="520">
+
+## Requirements
 
 | | |
 | --- | --- |
-| **`autodoom_pip.exe`** | AutoDoom built with picture-in-picture. Off by default. |
-| **`AutoDoom Launcher.exe`** | Pick an IWAD, a map PWAD and a play mode. Finds WADs by reading the NTFS journal. |
-| **`AutoDoomPip-Setup.exe`** | Installs both into an existing AutoDoom folder, with shortcuts and an uninstaller. |
-| **`autodoom-pip.patch`** | The engine change, 215 added lines across five files. |
+| OS | Windows 10 or 11 |
+| Game | An existing [AutoDoom](https://github.com/ioan-chera/AutoDoom) install, with `AutoDoom.exe` and the SDL2 DLLs |
+| IWAD | Any Doom, Doom II, Final Doom, Heretic or Freedoom IWAD |
+| Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — for the launcher only; the game itself needs nothing extra |
+| Optional | Administrator rights and an NTFS volume with an active USN journal, for the WAD finder |
 
-### Picture-in-picture
+## Installation
 
-Enable it with `-pip` on the command line, with the `pip` cvar, or by ticking the box in the
-launcher.
+1. Download **`AutoDoomPip-Setup.exe`** from the [latest release](https://github.com/LightWolfMan/autodoom-pip/releases/latest).
+2. Run it and point it at the folder that contains `AutoDoom.exe`. The installer refuses to
+   continue anywhere else.
+3. Launch **AutoDoom Launcher** from the Start menu.
 
-| cvar | what it does | default |
-| --- | --- | --- |
-| `pip` | turns the box on | `0` |
-| `pip_size` | size of each box, in % of the screen | `25` |
-| `pip_count` | how many boxes, laid out left to right | `1` |
-| `pip_bottom` | `0` = top row, `1` = bottom row | `0` |
-
-With a single box it follows **the player with the most kills**. Pressing **F12**
-(`spectate_next`) takes the box over for ten seconds, then it goes back to the leader. While
-PIP is on, that key only moves the box — your own view stays yours.
-
-### The launcher
-
-![The launcher](docs/launcher.png)
-
-- **Copilot** — the bot plays your character and hands control back the moment you touch the
-  keys, taking it again a second after you stop. This is stock AutoDoom behaviour; the launcher
-  just knows which switch turns it on (there isn't one: it's the *absence* of `-bots`).
-- **Coop** — you play alongside 1 to 4 bots. Four is the engine's ceiling (`MAXPLAYERS`), and at
-  four your own character goes on autopilot too, because there is no free slot left.
-- **Weapons disappear when picked up** — Doom's co-op default leaves weapons on the floor for
-  everyone (`DM_WEAPONSTAY`), which makes the game a lot easier. This passes `-dmflags 0`.
-- **Jumping** — the engine has always supported it, disabled behind `comp_aircontrol`.
-- **Kill scoreboard on F** — see below.
-- **Detect WADs** — reads the NTFS master file table through the USN journal instead of walking
-  every folder, which turns an hours-long disk sweep into seconds. Requires an NTFS volume with
-  an active journal, and administrator rights; the button stays disabled and explains why when
-  those are missing. Everything found is checked against what this engine can actually load
-  before it reaches the list.
-
-### Scoreboard in co-op
-
-![The scoreboard](docs/scoreboard.png)
-
-Eternity's scoreboard was gated to deathmatch. A small patch lets it run in co-op and rank by
-**kills** instead of frags — which is the only interesting ranking when you are watching bots.
-This lives in the same build and is enabled by the launcher.
-
-### Installing
-
-Run `AutoDoomPip-Setup.exe` and point it at the folder that contains `AutoDoom.exe`. It refuses
-to continue anywhere else, never touches the original executable, and registers an uninstaller.
-
-There is also `Install-AutoDoomPip.ps1` for a command-line install:
+Prefer the command line? The release also ships a PowerShell installer:
 
 ```powershell
 .\Install-AutoDoomPip.ps1 -Target "D:\Games\AutoDoom"
 ```
 
-### Building the engine
+To uninstall, use *Apps & features* in Windows, or the shortcut in the Start menu folder. Your
+original `AutoDoom.exe` is never touched.
+
+## Usage
+
+Open the launcher, pick an IWAD, choose a mode and press **Play**.
+
+| Mode | What happens |
+| --- | --- |
+| **Copilot** | The bot plays your character and hands control back the moment you touch the keys, taking it again a second after you stop. |
+| **Co-op** | You play alongside 1–4 bots. Four is the engine ceiling (`MAXPLAYERS`), and at four your own character goes on autopilot too, because no slot is left. |
+
+In game:
+
+| Key | Action |
+| --- | --- |
+| `F` (hold) | Kill scoreboard |
+| `F12` | Move the PIP box to the next player, for ten seconds |
+| `Space` | Jump, when enabled in the launcher |
+
+<img src="docs/scoreboard.png" alt="The co-op scoreboard ranked by kills, with the PIP box visible" width="720">
+
+## Configuration
+
+Picture-in-picture is off by default. Turn it on with the launcher checkbox, with `-pip` on the
+command line, or with the console variables below — all of them are saved in `eternity.cfg`.
+
+| cvar | What it does | Default | Range |
+| --- | --- | --- | --- |
+| `pip` | Turns the box on | `0` | `0`–`1` |
+| `pip_size` | Size of each box, as a percentage of the screen | `25` | `10`–`50` |
+| `pip_count` | How many boxes, laid out left to right | `1` | `1`–`3` |
+| `pip_bottom` | `0` = top row, `1` = bottom row | `0` | `0`–`1` |
+
+The launcher also flips two engine settings that have nothing to do with PIP:
+
+- **Weapons disappear when picked up** — Doom's co-op default leaves weapons on the floor for
+  everyone (`DM_WEAPONSTAY`), which makes the game noticeably easier. The launcher passes
+  `-dmflags 0`.
+- **Jumping** — supported by the engine since forever, disabled behind `comp_aircontrol`.
+
+## Building from source
 
 ```
 msbuild vc2019\Eternity.sln /p:Configuration=Release /p:Platform=Win32 ^
   /p:PlatformToolset=v143 /p:SDL2_0=<sdl2> /p:SDLMIXER2_0=<mixer> /p:SDLNET2_0=<net>
 ```
 
-Two things that cost an afternoon: the `adlmidi` submodule has to be populated
-(`git submodule update --init`), and **build Win32** if the binary is going to live next to the
-32-bit DLLs that ship with AutoDoom — an x64 build beside them dies with `0xc000007b`.
+Two things that cost an afternoon:
 
-### How it works
+- The **`adlmidi` submodule must be populated** (`git submodule update --init`), otherwise the
+  build fails on missing source files.
+- **Build Win32.** If the binary is going to sit next to the 32-bit DLLs that ship with
+  AutoDoom, an x64 build dies with `0xc000007b`.
+
+The launcher builds with `dotnet publish -c Release -r win-x64 --self-contained false
+-p:PublishSingleFile=true`; its source is in [`launcher-src/`](launcher-src).
+
+## How it works
 
 `R_RenderPlayerView` clears every buffer it uses on entry — clip segs, draw segs, planes,
 portals, sprites — so **calling it twice in one frame is safe**. The geometry is what needs
 care: `R_RenderPipView` saves `viewwindow`, the `cb_view_t`, the centers and the per-column
-height table, swaps in the box rectangle, renders, and puts it all back.
+height table, swaps in the box rectangle, renders, and puts everything back.
 
 The cost is not double. The BSP walk and thing setup repeat in full while only the pixel work
 scales with the box area, so a 25% box costs noticeably less than a second full render — but it
@@ -105,95 +147,146 @@ Eternity already renders alternate viewpoints through skybox and anchored portal
 always tied to map geometry. This is the same renderer pointed at a screen-space rectangle and
 a player instead.
 
-### Licence
+## Known limitations
 
-The Eternity Engine and AutoDoom are **GPLv3**, so `autodoom_pip.exe` is a derivative work:
-distributing the binary requires making the modified source available under the same licence.
-The modified source is published at
-[LightWolfMan/AutoDoom, branch `pip-view`](https://github.com/LightWolfMan/AutoDoom/tree/pip-view),
-and the same change is included here as `autodoom-pip.patch`.
+- Windows only, tested on a 32-bit Release build.
+- The WAD finder needs administrator rights and an active NTFS journal. Without them the button
+  stays disabled and says why, instead of falling back to an hours-long disk sweep.
+- `pip_count` above `1` is implemented but has had little real use.
+- No crouching: there is no crouch code anywhere in Eternity, only an unused ACS constant.
 
-The launcher is separate work, does not derive from Eternity, and is under the MIT licence
-(see `LICENSE-launcher.md`). Its source is in `launcher-src/`.
+## Contributing
+
+Issues and pull requests are welcome. The engine change is offered upstream at
+[ioan-chera/AutoDoom](https://github.com/ioan-chera/AutoDoom); the modified source lives in
+[LightWolfMan/AutoDoom, branch `pip-view`](https://github.com/LightWolfMan/AutoDoom/tree/pip-view).
+
+## Licence
+
+This repository carries two works with different origins.
+
+| Part | Licence | Why |
+| --- | --- | --- |
+| `autodoom_pip.exe`, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derived from the Eternity Engine and AutoDoom. The modified source is published [here](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
+| Launcher, installer script | [MIT](LICENSE-launcher.md) | Written from scratch; does not derive from Eternity. |
+
+## Credits
+
+- [Ioan Chera](https://github.com/ioan-chera) — AutoDoom and its pathfinding bot.
+- [Team Eternity](https://github.com/team-eternity/eternity) — the Eternity Engine.
+- id Software — Doom.
 
 ---
 
-## Português
+<div align="center">
 
-Ver um bot jogar fica bem melhor quando dá para ver o que *ele* vê. Isto acrescenta um
-quadrinho no canto com a visão de outro jogador, desenhado no mesmo quadro que a sua, mais um
+# Português
+
+**Picture-in-picture e um launcher amigável para o [AutoDoom](https://github.com/ioan-chera/AutoDoom) — o fork do Eternity Engine com o bot do Ioan Chera.**
+
+[English](#autodoom-pip--launcher) · **Português**
+
+</div>
+
+Ver um bot jogar fica bem melhor quando dá para ver o que *ele* vê. Este projeto acrescenta um
+quadrinho no canto com a visão de outro jogador, desenhado **no mesmo quadro** que a sua, mais um
 launcher que amarra as pontas soltas de rodar o AutoDoom.
 
-### O que vem na caixa
+## Índice
+
+- [Recursos](#recursos)
+- [Requisitos](#requisitos)
+- [Instalação](#instalação)
+- [Como usar](#como-usar)
+- [Configuração](#configuração)
+- [Compilando](#compilando)
+- [Como funciona](#como-funciona)
+- [Limitações conhecidas](#limitações-conhecidas)
+- [Licença](#licença-1)
+
+## Recursos
+
+- **Picture-in-picture** — de um a três quadrinhos com a visão de outros jogadores, desenhados no
+  mesmo quadro. Vem desligado.
+- **Segue o líder** — com um quadrinho só, ele acompanha quem mais matou. O `F12` empresta o
+  quadrinho por dez segundos e depois ele volta sozinho.
+- **Launcher** — escolha de IWAD e PWAD, modos Copiloto e Coop, número de bots, e um detector de
+  WADs que lê o journal do NTFS em vez de varrer o disco.
+- **Placar no coop** — segure `F` para o ranking por abates. O placar do Eternity só valia em
+  deathmatch; um patch pequeno abriu.
+- **Bilíngue** — o launcher acompanha o idioma do Windows (português ou inglês).
+- **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
+
+<img src="docs/launcher-pt.png" alt="A janela do AutoDoom Launcher" width="520">
+
+## Requisitos
 
 | | |
 | --- | --- |
-| **`autodoom_pip.exe`** | O AutoDoom compilado com picture-in-picture. Vem desligado. |
-| **`AutoDoom Launcher.exe`** | Escolhe IWAD, PWAD de mapa e modo de jogo. Acha WADs lendo o journal do NTFS. |
-| **`AutoDoomPip-Setup.exe`** | Instala os dois numa pasta do AutoDoom, com atalhos e desinstalador. |
-| **`autodoom-pip.patch`** | A mudança na engine: 215 linhas somadas em cinco arquivos. |
+| Sistema | Windows 10 ou 11 |
+| Jogo | Uma instalação do [AutoDoom](https://github.com/ioan-chera/AutoDoom), com `AutoDoom.exe` e as DLLs do SDL2 |
+| IWAD | Qualquer IWAD de Doom, Doom II, Final Doom, Heretic ou Freedoom |
+| Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — só para o launcher; o jogo não precisa de nada |
+| Opcional | Direitos de administrador e volume NTFS com journal ativo, para o detector de WADs |
 
-### Picture-in-picture
+## Instalação
 
-Liga com `-pip` na linha de comando, com o cvar `pip`, ou marcando a caixinha no launcher.
+1. Baixe o **`AutoDoomPip-Setup.exe`** na [última release](https://github.com/LightWolfMan/autodoom-pip/releases/latest).
+2. Rode e aponte para a pasta que contém o `AutoDoom.exe`. O instalador se recusa a continuar em
+   qualquer outro lugar.
+3. Abra o **AutoDoom Launcher** pelo Menu Iniciar.
 
-| cvar | o que faz | padrão |
-| --- | --- | --- |
-| `pip` | liga o quadrinho | `0` |
-| `pip_size` | tamanho de cada quadrinho, em % da tela | `25` |
-| `pip_count` | quantos quadrinhos, da esquerda para a direita | `1` |
-| `pip_bottom` | `0` = fila em cima, `1` = embaixo | `0` |
-
-Com um quadrinho só, ele segue **quem mais matou**. O **F12** (`spectate_next`) empresta o
-quadrinho para outro por dez segundos e depois ele volta sozinho para o líder. Com o PIP ligado,
-essa tecla mexe apenas no quadrinho: a tela grande continua sendo a sua.
-
-### O launcher
-
-- **Copiloto** — o bot joga o seu personagem e devolve o controle no instante em que você toca
-  nas teclas, retomando um segundo depois que você para. Isso é comportamento nativo do
-  AutoDoom; o launcher só sabe qual chave liga (não existe uma: é a **ausência** do `-bots`).
-- **Coop** — você joga ao lado de 1 a 4 bots. Quatro é o teto da engine (`MAXPLAYERS`), e nele
-  o seu personagem também entra no piloto automático, porque não sobra vaga.
-- **Armas somem ao pegar** — o padrão do coop do Doom deixa a arma no chão para todo mundo
-  (`DM_WEAPONSTAY`), o que facilita demais. Esta opção passa `-dmflags 0`.
-- **Pulo** — a engine sempre teve, desativado atrás do `comp_aircontrol`.
-- **Placar de abates no F** — veja abaixo.
-- **Detectar WADs** — lê a tabela de arquivos do NTFS pelo journal USN em vez de andar pasta por
-  pasta, o que transforma uma varredura de horas em segundos. Exige volume NTFS com journal
-  ativo e permissão de administrador; sem isso o botão fica desabilitado e explica o motivo.
-  Tudo que é achado passa por uma conferência de compatibilidade antes de chegar na lista.
-
-### Placar no coop
-
-O placar do Eternity só valia em deathmatch. Um patch pequeno faz ele valer no coop e ordenar
-por **abates** em vez de frags — que é o único ranking interessante quando se está assistindo
-bots. Vem no mesmo executável e é ligado pelo launcher.
-
-### Instalando
-
-Rode o `AutoDoomPip-Setup.exe` e aponte para a pasta que contém o `AutoDoom.exe`. Ele se recusa
-a continuar em qualquer outro lugar, nunca toca no executável original, e registra um
-desinstalador.
-
-Também existe o `Install-AutoDoomPip.ps1`, para instalar pela linha de comando:
+Pela linha de comando:
 
 ```powershell
 .\Install-AutoDoomPip.ps1 -Target "D:\Jogos\AutoDoom"
 ```
 
-### Compilando a engine
+Para desinstalar, use *Aplicativos e recursos* do Windows. O seu `AutoDoom.exe` original nunca é
+tocado.
+
+## Como usar
+
+| Modo | O que acontece |
+| --- | --- |
+| **Copiloto** | O bot joga o seu personagem e devolve o controle no instante em que você toca nas teclas, retomando um segundo depois que você para. |
+| **Coop** | Você joga ao lado de 1 a 4 bots. Quatro é o teto da engine (`MAXPLAYERS`), e nele o seu personagem também entra no piloto automático, porque não sobra vaga. |
+
+No jogo:
+
+| Tecla | Ação |
+| --- | --- |
+| `F` (segurando) | Placar de abates |
+| `F12` | Passa o quadrinho para o próximo jogador, por dez segundos |
+| `Espaço` | Pular, quando ligado no launcher |
+
+## Configuração
+
+| cvar | O que faz | Padrão | Faixa |
+| --- | --- | --- | --- |
+| `pip` | Liga o quadrinho | `0` | `0`–`1` |
+| `pip_size` | Tamanho de cada quadrinho, em % da tela | `25` | `10`–`50` |
+| `pip_count` | Quantos quadrinhos, da esquerda para a direita | `1` | `1`–`3` |
+| `pip_bottom` | `0` = fila em cima, `1` = embaixo | `0` | `0`–`1` |
+
+O launcher também mexe em duas opções da engine que nada têm a ver com o PIP:
+
+- **Armas somem ao pegar** — o padrão do coop do Doom deixa a arma no chão para todo mundo
+  (`DM_WEAPONSTAY`), o que facilita bastante. O launcher passa `-dmflags 0`.
+- **Pulo** — a engine sempre teve, desativado atrás do `comp_aircontrol`.
+
+## Compilando
 
 ```
 msbuild vc2019\Eternity.sln /p:Configuration=Release /p:Platform=Win32 ^
   /p:PlatformToolset=v143 /p:SDL2_0=<sdl2> /p:SDLMIXER2_0=<mixer> /p:SDLNET2_0=<net>
 ```
 
-Duas pedras que custaram uma tarde: o submódulo `adlmidi` precisa estar populado
-(`git submodule update --init`), e **compile em Win32** se o binário for conviver com as DLLs de
-32 bits que acompanham o AutoDoom — um build x64 ao lado delas morre com `0xc000007b`.
+Duas pedras que custaram uma tarde: o submódulo **`adlmidi` precisa estar populado**
+(`git submodule update --init`), e **compile em Win32** — um build x64 ao lado das DLLs de 32
+bits do AutoDoom morre com `0xc000007b`.
 
-### Como funciona
+## Como funciona
 
 O `R_RenderPlayerView` limpa todos os buffers que usa logo na entrada — clip segs, draw segs,
 planos, portais, sprites —, então **chamar duas vezes no mesmo quadro é seguro**. O que precisa
@@ -205,17 +298,17 @@ o trabalho de pixel escala com a área, então um quadrinho de 25% custa bem men
 render completo — mas custa, e num renderizador por software esse tempo disputa com o
 pensamento do bot.
 
-O Eternity já desenha pontos de vista alternativos através dos portais de skybox e ancorados;
-aqueles são sempre amarrados à geometria do mapa. Aqui é o mesmo renderizador apontado para um
-retângulo de tela e um jogador.
+## Limitações conhecidas
 
-### Licença
+- Só Windows, testado em build Release de 32 bits.
+- O detector de WADs exige administrador e journal NTFS ativo. Sem isso o botão fica desabilitado
+  e explica o motivo, em vez de cair numa varredura de horas.
+- `pip_count` maior que `1` está implementado, mas foi pouco usado de verdade.
+- Não há agachamento: não existe código de crouch no Eternity, apenas uma constante de ACS sem uso.
 
-O Eternity Engine e o AutoDoom são **GPLv3**, então o `autodoom_pip.exe` é trabalho derivado:
-distribuir o binário obriga a disponibilizar o fonte modificado sob a mesma licença. O fonte
-modificado está publicado em
-[LightWolfMan/AutoDoom, branch `pip-view`](https://github.com/LightWolfMan/AutoDoom/tree/pip-view),
-e a mesma mudança acompanha este repositório como `autodoom-pip.patch`.
+## Licença
 
-O launcher é trabalho separado, não deriva do Eternity, e está sob licença MIT
-(veja `LICENSE-launcher.md`). O fonte dele fica em `launcher-src/`.
+| Parte | Licença | Por quê |
+| --- | --- | --- |
+| `autodoom_pip.exe`, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derivado do Eternity Engine e do AutoDoom. O fonte modificado está publicado [aqui](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
+| Launcher, script de instalação | [MIT](LICENSE-launcher.md) | Escrito do zero; não deriva do Eternity. |
