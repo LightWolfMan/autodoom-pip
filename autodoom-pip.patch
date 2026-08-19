@@ -446,7 +446,7 @@ index 00000000..2bb2c7c2
 +
 +// EOF
 diff --git a/source/d_main.cpp b/source/d_main.cpp
-index 1a6e8939..2d2b4694 100644
+index 88b20bf8..2d2b4694 100644
 --- a/source/d_main.cpp
 +++ b/source/d_main.cpp
 @@ -79,6 +79,13 @@
@@ -463,10 +463,16 @@ index 1a6e8939..2d2b4694 100644
  #include "r_patch.h"
  #include "s_sound.h"
  #include "st_stuff.h"
-@@ -577,6 +584,187 @@ void D_DrawWings()
- // Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
- // principal e antes do HUD, que fica por cima de proposito.
- //
+@@ -571,6 +578,286 @@ void D_DrawWings()
+    }
+ }
+ 
++//
++// D_drawPipView
++//
++// Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
++// principal e antes do HUD, que fica por cima de proposito.
++//
 +//
 +// Posicao da saida do mapa, para o criterio "quem esta mais perto de sair".
 +//
@@ -648,13 +654,25 @@ index 1a6e8939..2d2b4694 100644
 +   V_FontWriteTextColored(font, text.constPtr(), color, tx, ty, &halfScale);
 +}
 +
- static void D_drawPipView()
- {
-    if(!pip_active || gamestate != GS_LEVEL || automapactive)
-@@ -596,11 +784,25 @@ static void D_drawPipView()
-    if(!count)
-       return;
- 
++static void D_drawPipView()
++{
++   if(!pip_active || gamestate != GS_LEVEL || automapactive)
++      return;
++
++   // Ranking por fragos/mortes: quem mais mata aparece primeiro. E o criterio
++   // automatico; o F12 empresta o lugar por 10 segundos e depois devolve.
++   int order[MAXPLAYERS];
++   int count = 0;
++
++   for(int i = 0; i < MAXPLAYERS; i++)
++   {
++      if(playeringame[i] && i != displayplayer && players[i].mo)
++         order[count++] = i;
++   }
++
++   if(!count)
++      return;
++
 +   v2fixed_t exitpos;
 +   const bool byExit = pip_follow && D_findExit(exitpos);
 +
@@ -669,30 +687,133 @@ index 1a6e8939..2d2b4694 100644
 +      return -static_cast<int64_t>(P_AproxDistance(mo->x - exitpos.x, mo->y - exitpos.y));
 +   };
 +
-    for(int a = 0; a < count - 1; a++)
-    {
-       for(int b = a + 1; b < count; b++)
-       {
--         if(players[order[b]].killcount > players[order[a]].killcount)
++   for(int a = 0; a < count - 1; a++)
++   {
++      for(int b = a + 1; b < count; b++)
++      {
 +         if(rank(order[b]) > rank(order[a]))
-          {
-             const int swap = order[a];
-             order[a] = order[b];
-@@ -650,12 +852,9 @@ static void D_drawPipView()
-    {
-       const int x = margin + n * (w + margin);   // sempre da esquerda para a direita
- 
--      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, w + 2, 1);
--      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y + h,  w + 2, 1);
--      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, 1, h + 2);
--      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x + w,  y - 1, 1, h + 2);
--
-       R_RenderPipView(&players[order[n]], x, y, w, h);
++         {
++            const int swap = order[a];
++            order[a] = order[b];
++            order[b] = swap;
++         }
++      }
++   }
++
++   // Escolha manual do F12 vale enquanto o prazo nao vence, e so no primeiro
++   // quadrinho -- os outros seguem o ranking.
++   if(gametic < pip_manual_until && pip_player >= 0 && pip_player < MAXPLAYERS &&
++      playeringame[pip_player] && pip_player != displayplayer)
++   {
++      for(int i = 0; i < count; i++)
++      {
++         if(order[i] == pip_player)
++         {
++            const int swap = order[0];
++            order[0] = order[i];
++            order[i] = swap;
++            break;
++         }
++      }
++   }
++   else if(gametic >= pip_manual_until)
++      pip_player = order[0];   // volta sozinho para quem mais mata
++
++   int boxes = pip_count;
++   if(boxes > count)
++      boxes = count;
++   if(boxes < 1)
++      boxes = 1;
++
++   const int margin = video.width / 64;
++   int w = video.width  * pip_size / 100;
++   int h = video.height * pip_size / 100;
++   w &= ~1;
++   h &= ~1;
++
++   // Nao deixa a fila estourar a largura da tela.
++   while(boxes > 1 && margin + boxes * (w + margin) > video.width)
++      boxes--;
++
++   const int y = pip_bottom ? video.height - h - margin : margin;
++
++   for(int n = 0; n < boxes; n++)
++   {
++      const int x = margin + n * (w + margin);   // sempre da esquerda para a direita
++
++      R_RenderPipView(&players[order[n]], x, y, w, h);
 +      D_drawPipFrame(players[order[n]], x, y, w, h);
 +      D_drawPipHud(players[order[n]], x, y, w, h);
-    }
- }
++   }
++}
++
+ //
+ // D_Display
+ //  draw current display, possibly wiping it from the previous
+@@ -617,6 +904,7 @@ static void D_Display()
+          {
+             R_DrawViewBorder();    // redraw border
+             R_RenderPlayerView(&players[displayplayer], camera);
++            D_drawPipView();          // PIP: visao de outro jogador no canto
+          }
+          
+          ST_Drawer(scaledwindow.height == SCREENHEIGHT);  // killough 11/98
+@@ -1722,6 +2010,10 @@ static void D_DoomInit()
+    if((p = M_CheckParm("-bots")) && p < myargc - 1)
+       netbot = atoi(myargv[p + 1]);
  
++   // PIP: liga o quadrinho com a visao de outro jogador
++   if(M_CheckParm("-pip"))
++      pip_active = 1;
++
+    if((netgame || M_CheckParm("-solo-net") || netbot) &&
+       GameType == gt_single)
+    {
+diff --git a/source/g_cmd.cpp b/source/g_cmd.cpp
+index d1a56c42..a247293c 100644
+--- a/source/g_cmd.cpp
++++ b/source/g_cmd.cpp
+@@ -42,6 +42,7 @@
+ #include "e_player.h" // haleyjd: turbo cmd must alter playerclass info
+ #include "f_wipe.h"
+ #include "g_game.h"
++#include "r_main.h"
+ #include "hal/i_timer.h"
+ #include "hu_stuff.h"
+ #include "i_system.h"
+@@ -635,11 +636,30 @@ CONSOLE_COMMAND(spectate_prev, 0)
+ 
+ CONSOLE_COMMAND(spectate_next, 0)
+ {
+-   int i = displayplayer + 1;
+-
+    if((gamestate != GS_LEVEL) || ((!demoplayback) && (GameType == gt_dm)))
+       return;
+ 
++   // Com o PIP ligado a tecla passa a girar quem aparece no quadrinho, e a
++   // tela grande continua sendo a sua.
++   if(pip_active)
++   {
++      int start = (pip_player < 0 || pip_player >= MAXPLAYERS) ? displayplayer : pip_player;
++      for(int n = 1; n <= MAXPLAYERS; n++)
++      {
++         int i = (start + n) % MAXPLAYERS;
++         if(playeringame[i] && i != displayplayer)
++         {
++            pip_player = i;
++            // 10 segundos de escolha manual; depois volta para quem mais mata
++            pip_manual_until = gametic + 10 * TICRATE;
++            return;
++         }
++      }
++      return;
++   }
++
++   int i = displayplayer + 1;
++
+    for(; i != displayplayer; i++)
+    {
+       if(i >= MAXPLAYERS)
 diff --git a/source/g_game.cpp b/source/g_game.cpp
 index 320fcbc7..63f8974b 100644
 --- a/source/g_game.cpp
@@ -766,7 +887,7 @@ index 27eebb8e..5e66f9e7 100644
              temp = sortedplayers[i];
              sortedplayers[i] = sortedplayers[i+1];
 diff --git a/source/m_misc.cpp b/source/m_misc.cpp
-index 220ef4de..57a399d0 100644
+index 6213b636..57a399d0 100644
 --- a/source/m_misc.cpp
 +++ b/source/m_misc.cpp
 @@ -61,6 +61,7 @@
@@ -777,10 +898,23 @@ index 220ef4de..57a399d0 100644
  #include "r_sky.h"
  #include "r_things.h"
  #include "s_sound.h"
-@@ -476,6 +477,19 @@ default_t defaults[] =
-    DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
-                "How many PIP boxes to show, left to right"),
+@@ -463,6 +464,32 @@ default_t defaults[] =
+    DEFAULT_INT("comp_aircontrol", &default_comp[comp_aircontrol], &comp[comp_aircontrol],
+                1, 0, 1, default_t::wad_yes, "Disable jumping for DOOM/Heretic"),
  
++   // PIP: visao de outro jogador num quadrinho no canto
++   DEFAULT_INT("pip", &pip_active, nullptr, 0, 0, 1, default_t::wad_no,
++               "1 to show another player's view in a corner box"),
++
++   DEFAULT_INT("pip_size", &pip_size, nullptr, 25, 10, 50, default_t::wad_no,
++               "PIP box size as a percentage of the screen"),
++
++   DEFAULT_INT("pip_bottom", &pip_bottom, nullptr, 0, 0, 1, default_t::wad_no,
++               "PIP row: 0=top of the screen, 1=bottom"),
++
++   DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
++               "How many PIP boxes to show, left to right"),
++
 +   DEFAULT_INT("pip_follow", &pip_follow, nullptr, 0, 0, 1, default_t::wad_no,
 +               "PIP target: 0=most kills, 1=closest to the exit"),
 +
@@ -847,42 +981,149 @@ index b6027152..dbfcba44 100644
           if(playeringame[i])
           {
 diff --git a/source/r_main.cpp b/source/r_main.cpp
-index aaacdd0d..6747af79 100644
+index 2ec797bc..6747af79 100644
 --- a/source/r_main.cpp
 +++ b/source/r_main.cpp
-@@ -1230,6 +1230,7 @@ int pip_active = 0;   // liga/desliga
- int pip_size   = 25;  // porcentagem da tela, por quadrinho
- int pip_bottom = 0;   // 0 = fila em cima, 1 = fila embaixo
- int pip_count  = 1;   // quantos quadrinhos, da esquerda para a direita
+@@ -1217,6 +1217,74 @@ extern void R_UntaintPortals();
+ //
+ // Primary renderer entry point.
+ //
++//
++// PIP -- picture-in-picture: a visao de outro jogador num quadrinho no canto.
++//
++// Funciona porque R_RenderPlayerView limpa todos os buffers dele na entrada
++// (clip segs, draw segs, planos, portais, sprites), entao chamar duas vezes no
++// mesmo quadro e seguro. O que precisa de cuidado e a geometria: viewwindow,
++// os centros, o struct view e a tabela de altura por coluna. Tudo isso e
++// salvo, trocado pelo retangulo do PIP e devolvido no fim.
++//
++int pip_active = 0;   // liga/desliga
++int pip_size   = 25;  // porcentagem da tela, por quadrinho
++int pip_bottom = 0;   // 0 = fila em cima, 1 = fila embaixo
++int pip_count  = 1;   // quantos quadrinhos, da esquerda para a direita
 +int pip_follow = 0;   // 0 = quem mais mata, 1 = quem esta mais perto da saida
- int pip_player = -1;  // escolhido a mao pelo F12; -1 = automatico
- int pip_manual_until = 0; // ate que gametic a escolha manual manda
++int pip_player = -1;  // escolhido a mao pelo F12; -1 = automatico
++int pip_manual_until = 0; // ate que gametic a escolha manual manda
++
++void R_RenderPipView(player_t *player, int x, int y, int w, int h)
++{
++   if(!player || !player->mo || w < 32 || h < 32)
++      return;
++
++   const rrect_t   savedWindow  = viewwindow;
++   const cb_view_t savedView    = view;
++   const int       savedCenterX = centerx;
++   const int       savedCenterY = centery;
++   const fixed_t   savedCXFrac  = centerxfrac;
++   const fixed_t   savedCYFrac  = centeryfrac;
++
++   viewwindow.x      = x;
++   viewwindow.y      = y;
++   viewwindow.width  = w;
++   viewwindow.height = h;
++
++   centerx     = w / 2;
++   centery     = h / 2;
++   centerxfrac = centerx << FRACBITS;
++   centeryfrac = centery << FRACBITS;
++
++   view.xcenter = (view.width  = (float)w) * 0.5f;
++   view.ycenter = (view.height = (float)h) * 0.5f;
++
++   // A arma do outro jogador tem que encolher junto, senao vira um canhao
++   // ocupando o quadrinho inteiro.
++   const float shrinkX = (float)w / (float)savedWindow.width;
++   const float shrinkY = (float)h / (float)savedWindow.height;
++   view.pspritexscale *= shrinkX;
++   view.pspriteyscale *= shrinkY;
++   view.pspriteystep   = 1.0f / view.pspriteyscale;
++
++   R_InitTextureMapping();
++   for(int i = 0; i < w; i++)
++      screenheightarray[i] = view.height - 1.0f;
++
++   R_RenderPlayerView(player, nullptr);
++
++   viewwindow  = savedWindow;
++   view        = savedView;
++   centerx     = savedCenterX;
++   centery     = savedCenterY;
++   centerxfrac = savedCXFrac;
++   centeryfrac = savedCYFrac;
++
++   R_InitTextureMapping();
++   for(int i = 0; i < viewwindow.width; i++)
++      screenheightarray[i] = view.height - 1.0f;
++}
++
+ void R_RenderPlayerView(player_t* player, camera_t *camerapoint)
+ {
+    bool quake = false;
+@@ -1481,6 +1549,13 @@ VARIABLE_TOGGLE(r_boomcolormaps, nullptr,           onoff);
+ // SoM: Variable FOV
+ VARIABLE_INT(fov, nullptr, 20, 179, nullptr);
  
-@@ -1553,6 +1554,7 @@ VARIABLE_INT(pip_active, nullptr, 0,  1,  nullptr);
- VARIABLE_INT(pip_size,   nullptr, 10, 50, nullptr);
- VARIABLE_INT(pip_bottom, nullptr, 0,  1,  nullptr);
- VARIABLE_INT(pip_count,  nullptr, 1,  3,  nullptr);
++// PIP
++VARIABLE_INT(pip_active, nullptr, 0,  1,  nullptr);
++VARIABLE_INT(pip_size,   nullptr, 10, 50, nullptr);
++VARIABLE_INT(pip_bottom, nullptr, 0,  1,  nullptr);
++VARIABLE_INT(pip_count,  nullptr, 1,  3,  nullptr);
 +VARIABLE_INT(pip_follow, nullptr, 0,  1,  nullptr);
- 
++
  // SoM: Portal tainted
  VARIABLE_BOOLEAN(showtainted, nullptr,              onoff);
-@@ -1576,6 +1578,7 @@ CONSOLE_VARIABLE(pip, pip_active, 0) {}
- CONSOLE_VARIABLE(pip_size, pip_size, 0) {}
- CONSOLE_VARIABLE(pip_bottom, pip_bottom, 0) {}
- CONSOLE_VARIABLE(pip_count, pip_count, 0) {}
-+CONSOLE_VARIABLE(pip_follow, pip_follow, 0) {}
  
+@@ -1499,6 +1574,12 @@ CONSOLE_VARIABLE(r_fov, fov, 0)
+ 
+ CONSOLE_VARIABLE(r_showrefused, showtainted, 0) {}
+ 
++CONSOLE_VARIABLE(pip, pip_active, 0) {}
++CONSOLE_VARIABLE(pip_size, pip_size, 0) {}
++CONSOLE_VARIABLE(pip_bottom, pip_bottom, 0) {}
++CONSOLE_VARIABLE(pip_count, pip_count, 0) {}
++CONSOLE_VARIABLE(pip_follow, pip_follow, 0) {}
++
  CONSOLE_VARIABLE(gamma, usegamma, 0)
  {
+    const char *msg;
 diff --git a/source/r_main.h b/source/r_main.h
-index 905b4934..f6805d08 100644
+index 46fa3381..f6805d08 100644
 --- a/source/r_main.h
 +++ b/source/r_main.h
-@@ -125,6 +125,7 @@ extern int pip_active;
- extern int pip_size;
- extern int pip_bottom;
- extern int pip_count;
-+extern int pip_follow;
- extern int pip_player;
- extern int pip_manual_until;
+@@ -119,6 +119,16 @@ struct player_t;
  
+ void R_RenderPlayerView(player_t *player, camera_t *viewcamera);
+ 
++// PIP: segunda visao, num retangulo qualquer da tela
++void R_RenderPipView(player_t *player, int x, int y, int w, int h);
++extern int pip_active;
++extern int pip_size;
++extern int pip_bottom;
++extern int pip_count;
++extern int pip_follow;
++extern int pip_player;
++extern int pip_manual_until;
++
+ //
+ // R_ResetFOV
+ // 
+diff --git a/vc2019/Eternity.vcxproj b/vc2019/Eternity.vcxproj
+index 2f14f089..4cdb3058 100644
+--- a/vc2019/Eternity.vcxproj
++++ b/vc2019/Eternity.vcxproj
+@@ -526,6 +526,7 @@
+     <ClCompile Include="..\source\autodoom\b_path.cpp" />
+     <ClCompile Include="..\source\autodoom\b_statistics.cpp" />
+     <ClCompile Include="..\source\autodoom\b_think.cpp" />
++    <ClCompile Include="..\source\autodoom\b_vote.cpp" />
+     <ClCompile Include="..\source\autodoom\b_trace.cpp" />
+     <ClCompile Include="..\source\autodoom\b_util.cpp" />
+     <ClCompile Include="..\source\autodoom\b_vocabulary.cpp" />
+@@ -2661,6 +2662,7 @@
+     <ClInclude Include="..\source\autodoom\b_path.h" />
+     <ClInclude Include="..\source\autodoom\b_statistics.h" />
+     <ClInclude Include="..\source\autodoom\b_think.h" />
++    <ClInclude Include="..\source\autodoom\b_vote.h" />
+     <ClInclude Include="..\source\autodoom\b_trace.h" />
+     <ClInclude Include="..\source\autodoom\b_util.h" />
+     <ClInclude Include="..\source\autodoom\b_vocabulary.h" />
