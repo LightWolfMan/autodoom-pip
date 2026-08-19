@@ -48,10 +48,10 @@ loose ends of running AutoDoom together.
   the game's translation tables, and flashes white when they take a hit. Health and ammo are
   printed under the box, in the same colour.
 - **Friendly fire switch** — co-op in Doom lets players hurt each other; you can turn that off.
-- **Launcher** — a GTK4 skeleton lives in [`linux-launcher/`](linux-launcher); it already
-  builds the right command line and starts the game. Finding WADs uses `plocate`, the
-  practical answer here: `locate '*.wad'` answers in milliseconds, needs no privilege, and
-  ships on most Debian and Arch desktops.
+- **Launcher** — a GTK4 + libadwaita window in [`linux-launcher/`](linux-launcher): IWAD and
+  PWAD pickers, the copilot switch, 0–3 companions, and the engine settings written for you.
+  Finding WADs uses `plocate`: `locate '*.wad'` answers in milliseconds, needs no privilege,
+  and ships on most Debian and Arch desktops.
 - **Nobody leaves without asking** — a bot that reaches the exit switch stops there and asks
   you, with the engine's own yes/no prompt. Say no and the level gets another minute before
   anyone asks again.
@@ -63,11 +63,10 @@ loose ends of running AutoDoom together.
   to configure.
 - **Non-destructive** — the patched binary sits *beside* a stock AutoDoom build, never on top of it.
 
-<img src="docs/linux-launcher.png" alt="The GTK4 launcher skeleton running on Ubuntu 24.04" width="520">
+<img src="docs/launcher-en.png" alt="The AutoDoom Launcher window on Ubuntu 24.04" width="620">
 
-<sub>The GTK4 skeleton in <a href="linux-launcher"><code>linux-launcher/</code></a>. It opens,
-builds the right command line and starts the game; the PWAD picker and the IWAD details panel
-are still missing.</sub>
+<sub>The launcher follows your locale — this is the same window under
+<code>LC_ALL=en_US.UTF-8</code>.</sub>
 
 ### The keyboard layout
 
@@ -84,7 +83,7 @@ jump, `R` to reload, `Shift` to run, `Alt` to strafe, `F` for the scoreboard, `B
 cp keys/autodoom-modern.csc ~/AutoDoom/user/doom/keys.csc   # with the game closed
 ```
 
-The launcher skeleton does this for you, and only for profiles that have no `keys.csc` yet —
+The launcher does this for you, and only for profiles that have no `keys.csc` yet —
 an existing profile keeps its owner's keys.
 
 ## Requirements
@@ -94,7 +93,7 @@ an existing profile keeps its owner's keys.
 | OS | Linux. Verified on Ubuntu 24.04; Debian and Arch are the targets |
 | Build | GCC 13+ or Clang, CMake 3.x, SDL2 + SDL2_mixer + SDL2_net development packages |
 | IWAD | Any Doom, Doom II, Final Doom, Heretic or Freedoom IWAD |
-| Launcher | Python 3.11+, PyGObject, GTK 4 and libadwaita — only for the launcher skeleton; the game needs none of it |
+| Launcher | Python 3.11+, PyGObject, GTK 4 and libadwaita — only for the launcher; the game needs none of it |
 | Optional | `plocate`, so the launcher can find WADs outside the usual folders |
 
 ## Installation
@@ -228,7 +227,10 @@ a player instead.
 
 ## Known limitations
 
-- The launcher is a skeleton: no PWAD picker, no IWAD details panel, no progress bar yet.
+- The launcher is a **release candidate**: it does everything the window offers, but it has
+  not had months of real use behind it yet. The IWAD panel shows name, file, type and size —
+  not the logo drawn from inside the WAD — and a PWAD is chosen by hand, without the
+  compatibility check.
 - Finding WADs depends on `plocate`'s database. A WAD created after the last `updatedb` run is
   invisible until the next one — run `sudo updatedb` if something is missing. There is no
   the filesystem keeps no queryable diary of file names, so an index is the only fast answer.
@@ -294,10 +296,10 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   das tabelas de tradução do próprio jogo, e pisca de branco quando ele leva dano. Vida e
   munição saem embaixo do quadro, na mesma cor.
 - **Fogo amigo** — no coop do Doom os jogadores se ferem; dá para desligar.
-- **Launcher** — um esqueleto em GTK4 vive em [`linux-launcher/`](linux-launcher); ele já monta
-  a linha de comando certa e sobe o jogo. A busca de WADs usa `plocate`, que é a resposta
-  prática aqui: `locate '*.wad'` responde em milissegundos, não pede privilégio nenhum e vem
-  na maioria dos desktops Debian e Arch.
+- **Launcher** — uma janela GTK4 + libadwaita em [`linux-launcher/`](linux-launcher): escolha
+  de IWAD e PWAD, o interruptor do copiloto, 0 a 3 companheiros e a configuração da engine
+  escrita para você. A busca de WADs usa `plocate`: `locate '*.wad'` responde em
+  milissegundos, não pede privilégio nenhum e vem na maioria dos desktops Debian e Arch.
 - **Ninguém sai sem perguntar** — o bot que chega no botão da saída para ali e pergunta, com o
   mesmo diálogo de sim/não que a engine usa para sair do jogo. Diga não e o mapa ganha mais um
   minuto antes de alguém perguntar de novo.
@@ -309,11 +311,10 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   para configurar.
 - **Não destrutivo** — o binário com o patch fica *ao lado* de um AutoDoom comum, nunca por cima.
 
-<img src="docs/linux-launcher.png" alt="O esqueleto do launcher GTK4 rodando no Ubuntu 24.04" width="520">
+<img src="docs/launcher-pt.png" alt="A janela do AutoDoom Launcher no Ubuntu 24.04" width="620">
 
-<sub>O esqueleto em GTK4 que vive em <a href="linux-launcher"><code>linux-launcher/</code></a>.
-Ele abre, monta a linha de comando certa e sobe o jogo; falta o seletor de PWAD e a ficha do
-IWAD.</sub>
+<sub>O launcher acompanha o idioma do sistema — esta é a mesma janela com o locale em
+português.</sub>
 
 ### O teclado
 
@@ -330,7 +331,7 @@ placar, `Backspace` para o `bot_unstick` e `F12` para girar quem aparece no quad
 cp keys/autodoom-modern.csc ~/AutoDoom/user/doom/keys.csc   # com o jogo fechado
 ```
 
-O esqueleto do launcher já faz isso sozinho, e só em perfil que ainda não tem `keys.csc` —
+O launcher já faz isso sozinho, e só em perfil que ainda não tem `keys.csc` —
 perfil existente mantém as teclas do dono.
 
 ## Requisitos
@@ -340,7 +341,7 @@ perfil existente mantém as teclas do dono.
 | Sistema | Linux. Verificado na Ubuntu 24.04; o alvo são Debian e Arch |
 | Build | GCC 13+ ou Clang, CMake 3.x, pacotes de desenvolvimento do SDL2, SDL2_mixer e SDL2_net |
 | IWAD | Qualquer IWAD de Doom, Doom II, Final Doom, Heretic ou Freedoom |
-| Launcher | Python 3.11+, PyGObject, GTK 4 e libadwaita — só para o esqueleto do launcher; o jogo não precisa de nada disso |
+| Launcher | Python 3.11+, PyGObject, GTK 4 e libadwaita — só para o launcher; o jogo não precisa de nada disso |
 | Opcional | `plocate`, para o launcher achar WAD fora das pastas usuais |
 
 ## Instalação
@@ -454,7 +455,10 @@ pensamento do bot.
 
 ## Limitações conhecidas
 
-- O launcher é um esqueleto: ainda sem seletor de PWAD, sem ficha do IWAD e sem barra de progresso.
+- O launcher é um **release candidate**: faz tudo que a janela oferece, mas ainda não tem
+  meses de uso real atrás dele. A ficha do IWAD mostra nome, arquivo, tipo e tamanho — não o
+  logo desenhado de dentro do WAD — e o PWAD é escolhido na mão, sem o teste de
+  compatibilidade.
 - A busca de WADs depende do banco do `plocate`. Um WAD criado depois do último `updatedb` fica
   invisível até o próximo — rode `sudo updatedb` se faltar algo. O sistema de arquivos não
   guarda um diário de nomes consultável, então um índice é a única resposta rápida.

@@ -1,3 +1,3 @@
-"""Launcher do AutoDoom para Linux (esqueleto)."""
+"""Launcher do AutoDoom para Linux."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0rc1"

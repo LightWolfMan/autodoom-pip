@@ -10,8 +10,8 @@ companheiros sao uma contagem de 0 a 3, porque as duas coisas passaram a ser
 independentes na engine -- da para jogar com um companheiro e o copiloto ligado
 ao mesmo tempo, combinacao que o par exclusivo nao sabia expressar.
 
-Falta ainda: validacao de compatibilidade do PWAD, o logo do jogo lido de dentro
-do proprio WAD e os textos em ingles.
+Falta ainda para sair de RC: validacao de compatibilidade do PWAD e o logo do
+jogo lido de dentro do proprio WAD.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from . import catalog, config, game, icons  # noqa: E402
+from . import catalog, config, game, icons, strings as t  # noqa: E402
 from .game import Options  # noqa: E402
 from .wad import describe  # noqa: E402
 
@@ -184,8 +184,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         self._copilot = Gtk.CheckButton(active=self._settings.get("copilot", True))
         self._copilot.connect("toggled", lambda _b: self._update_hint())
         rows.append(self._option_card(
-            self._copilot, "bot", "Copiloto",
-            "O bot joga o seu personagem e devolve o controle quando você mexe"))
+            self._copilot, "bot", t.COPILOT, t.COPILOT_HINT))
 
         # Um unico Gtk.Adjustment para o slider e o spinner. Antes eram dois
         # valores espelhados na mao, com uma trava para nao se chamarem em
@@ -215,13 +214,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         slider_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         slider_row.append(self._companions)
         slider_row.append(self._spin)
-        slider_row.append(Gtk.Label(label="bots", valign=Gtk.Align.CENTER))
+        slider_row.append(Gtk.Label(label=t.BOTS_WORD, valign=Gtk.Align.CENTER))
 
-        rows.append(self._option_card(None, "people", "Bots companheiros:", None, slider_row))
+        rows.append(self._option_card(None, "people", t.COMPANIONS, None, slider_row))
         grid.append(rows)
         grid.append(info)
 
-        return self._section("Modo", "gamepad", grid)
+        return self._section(t.SECTION_MODE, "gamepad", grid)
 
     def _on_bots_changed(self, adjustment: Gtk.Adjustment) -> None:
         # O round_digits arredonda o que o usuario arrasta, mas nao o que o
@@ -244,11 +243,8 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def _update_hint(self) -> None:
         count = self._companion_count()
-        first = ("O bot dirige o seu personagem e solta o controle a cada toque seu nas teclas."
-                 if self._copilot.get_active()
-                 else "Sem copiloto: você joga o seu personagem do início ao fim.")
-        second = ("Sem companheiros: só você no mapa." if count == 0
-                  else f"{count} companheiro(s) de bot, nos slots 2 a {count + 1}. Máximo de 3.")
+        first = t.COPILOT_ON if self._copilot.get_active() else t.COPILOT_OFF
+        second = t.NO_COMPANIONS if count == 0 else t.companions_hint(count)
         self._hint.set_text(f"{first}\n{second}")
 
     # ------------------------------------------------------------ extras
@@ -258,31 +254,26 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         self._pip = Gtk.CheckButton(active=self._settings.get("pip", True))
         grid.attach(self._option_card(
-            self._pip, "pip", "Ver a tela dos bots num quadrinho",
-            "Precisa do binário com o patch."), 0, 0, 1, 1)
+            self._pip, "pip", t.PIP, t.PIP_HINT), 0, 0, 1, 1)
 
         self._weapons = Gtk.CheckButton(active=self._settings.get("weapons", True))
         grid.attach(self._option_card(
-            self._weapons, "target", "Armas somem ao pegar, como no single player",
-            "No coop o padrão é a arma ficar no chão para todo mundo pegar."), 1, 0, 1, 1)
+            self._weapons, "target", t.WEAPONS, t.WEAPONS_HINT), 1, 0, 1, 1)
 
-        self._follow = Gtk.DropDown.new_from_strings(
-            ["quem mais mata", "quem está mais perto da saída"])
+        self._follow = Gtk.DropDown.new_from_strings([t.FOLLOW_KILLS, t.FOLLOW_EXIT])
         self._follow.set_selected(self._settings.get("follow", 0))
-        grid.attach(self._option_card(None, "camera", "A câmera segue:", None, self._follow),
+        grid.attach(self._option_card(None, "camera", t.CAMERA, None, self._follow),
                     0, 1, 1, 1)
 
         self._jump = Gtk.CheckButton(active=self._settings.get("jump", True))
         grid.attach(self._option_card(
-            self._jump, "jump", "Liberar o pulo",
-            "A engine vem com o pulo desativado."), 1, 1, 1, 1)
+            self._jump, "jump", t.JUMP, t.JUMP_HINT), 1, 1, 1, 1)
 
         self._scores = Gtk.CheckButton(active=self._settings.get("scores", True))
         grid.attach(self._option_card(
-            self._scores, "shield", "Placar de abates ao segurar F",
-            "Mostra o ranking de kills enquanto a tecla estiver pressionada."), 0, 2, 1, 1)
+            self._scores, "shield", t.SCORES, t.SCORES_HINT), 0, 2, 1, 1)
 
-        return self._section("Extras", "settings", grid)
+        return self._section(t.SECTION_EXTRAS, "settings", grid)
 
     # -------------------------------------------------------------- iwad
 
@@ -298,8 +289,8 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         buttons = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
                           valign=Gtk.Align.CENTER)
-        buttons.append(self._icon_button("Abrir...", "folder", self._on_open_iwad))
-        buttons.append(self._icon_button("Detectar IWADs...", "scan", self._on_scan))
+        buttons.append(self._icon_button(t.OPEN, "folder", self._on_open_iwad))
+        buttons.append(self._icon_button(t.DETECT, "scan", self._on_scan))
         row.append(buttons)
 
         self._details = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
@@ -307,7 +298,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         self._details.set_size_request(250, -1)
         row.append(self._details)
 
-        return self._section("IWAD", "document", row)
+        return self._section(t.SECTION_IWAD, "document", row)
 
     def _update_details(self) -> None:
         while (child := self._details.get_first_child()) is not None:
@@ -324,9 +315,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         except OSError:
             size = 0.0
 
-        for key, value in (("Arquivo:", os.path.basename(iwad.path)),
-                           ("Tipo:", "IWAD"),
-                           ("Tamanho:", f"{size:.2f} MB".replace(".", ","))):
+        size_text = f"{size:.2f} MB"
+        if t.PORTUGUESE:
+            size_text = size_text.replace(".", ",")
+
+        for key, value in ((t.DETAIL_FILE, os.path.basename(iwad.path)),
+                           (t.DETAIL_KIND, "IWAD"),
+                           (t.DETAIL_SIZE, size_text)):
             line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             name = Gtk.Label(label=key, xalign=0, css_classes=["heading"])
             name.set_size_request(90, -1)
@@ -359,29 +354,29 @@ class LauncherWindow(Adw.ApplicationWindow):
             self._list.select_row(self._list.get_row_at_index(chosen))
 
         if not found and hasattr(self, "_status"):
-            self._status.set_text("Nenhum IWAD encontrado. Use 'Detectar IWADs...' ou 'Abrir...'.")
+            self._status.set_text(t.NO_IWAD_FOUND)
 
     # -------------------------------------------------------------- pwad
 
     def _build_pwad(self) -> Gtk.Widget:
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        self._pwad = Gtk.DropDown.new_from_strings(["(nenhum)"])
+        self._pwad = Gtk.DropDown.new_from_strings([t.NONE_PWAD])
         self._pwad.set_hexpand(True)
         row.append(self._pwad)
-        row.append(self._icon_button("Abrir...", "folder", self._on_open_pwad))
-        return self._section("PWAD de mapa (opcional)", "puzzle", row)
+        row.append(self._icon_button(t.OPEN, "folder", self._on_open_pwad))
+        return self._section(t.SECTION_PWAD, "puzzle", row)
 
     # ------------------------------------------------------------ rodape
 
     def _build_footer(self) -> Gtk.Widget:
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12,
                       halign=Gtk.Align.CENTER, margin_top=10)
-        bar.append(self._icon_button("Sair", "exit", lambda _b: self.close(), width=180))
+        bar.append(self._icon_button(t.QUIT, "exit", lambda _b: self.close(), width=180))
 
         content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8,
                           halign=Gtk.Align.CENTER)
         content.append(icons.image("play", 16, (255, 255, 255)))
-        content.append(Gtk.Label(label="Jogar"))
+        content.append(Gtk.Label(label=t.PLAY))
         play = Gtk.Button(child=content, css_classes=["suggested-action"])
         play.set_size_request(220, 42)
         play.connect("clicked", self._on_play)
@@ -399,11 +394,10 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def _on_scan(self, _button: Gtk.Button) -> None:
         if not catalog.has_plocate():
-            self._status.set_text(
-                "plocate não instalado: apt install plocate (Debian) ou pacman -S plocate (Arch)")
+            self._status.set_text(t.NO_PLOCATE)
             return
 
-        self._status.set_text("Procurando...")
+        self._status.set_text(t.SEARCHING)
 
         def worker() -> None:
             found = catalog.build(self._game_dir, use_locate=True)
@@ -415,19 +409,19 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def _finish_scan(self, found: list) -> bool:
         self._fill_list(found)
-        self._status.set_text(f"{len(found)} IWAD(s) encontrados")
+        self._status.set_text(t.found_iwads(len(found)))
         return False
 
     def _on_open_iwad(self, _button: Gtk.Button) -> None:
-        self._open_file("Escolher IWAD", self._add_iwad)
+        self._open_file(t.CHOOSE_IWAD, self._add_iwad)
 
     def _on_open_pwad(self, _button: Gtk.Button) -> None:
-        self._open_file("Escolher PWAD", self._add_pwad)
+        self._open_file(t.CHOOSE_PWAD, self._add_pwad)
 
     def _open_file(self, title: str, done) -> None:
         chooser = Gtk.FileDialog(title=title)
         filters = Gio.ListStore.new(Gtk.FileFilter)
-        wads = Gtk.FileFilter(name="WAD e PK3")
+        wads = Gtk.FileFilter(name=t.FILE_FILTER)
         for pattern in ("*.wad", "*.WAD", "*.pk3", "*.pke", "*.zip"):
             wads.add_pattern(pattern)
         filters.append(wads)
@@ -446,7 +440,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def _add_iwad(self, path: str) -> None:
         found = describe(path)
         if found is None:
-            self._status.set_text(f"{os.path.basename(path)} não é um IWAD conhecido")
+            self._status.set_text(t.not_an_iwad(os.path.basename(path)))
             return
         self._fill_list([found, *[i for i in self._iwads if i.path != found.path]])
 
@@ -454,20 +448,19 @@ class LauncherWindow(Adw.ApplicationWindow):
         self._pwad_path = path
         model = Gtk.StringList()
         model.append(os.path.basename(path))
-        model.append("(nenhum)")
+        model.append(t.NONE_PWAD)
         self._pwad.set_model(model)
         self._pwad.set_selected(0)
 
     def _on_play(self, _button: Gtk.Button) -> None:
         iwad = self._selected_iwad()
         if iwad is None:
-            self._status.set_text("Escolha um IWAD primeiro")
+            self._status.set_text(t.PICK_IWAD_FIRST)
             return
 
         engine = game.find_engine(self._game_dir)
         if engine is None:
-            self._status.set_text(
-                f"Binário da engine não encontrado em {self._game_dir} nem no PATH")
+            self._status.set_text(t.engine_missing(self._game_dir))
             return
 
         opts = Options(
