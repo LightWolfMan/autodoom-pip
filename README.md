@@ -65,7 +65,7 @@ loose ends of running AutoDoom together.
 
 | | |
 | --- | --- |
-| OS | Windows 10 or 11 |
+| OS | Windows 10 or 11 — on Linux, use the [`linux` branch](https://github.com/LightWolfMan/autodoom-pip/tree/linux) |
 | Game | An existing [AutoDoom](https://github.com/ioan-chera/AutoDoom) install, with `AutoDoom.exe` and the SDL2 DLLs |
 | IWAD | Any Doom, Doom II, Final Doom, Heretic or Freedoom IWAD |
 | Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — for the launcher only; the game itself needs nothing extra |
@@ -191,7 +191,10 @@ a player instead.
 
 ## Known limitations
 
-- Windows only, tested on a 32-bit Release build.
+- **The launcher** is Windows only, tested on a 32-bit Release build. The engine is not:
+  it builds and runs on Linux from the same patch — see the
+  [`linux` branch](https://github.com/LightWolfMan/autodoom-pip/tree/linux), which carries the
+  build recipe and a GTK4 launcher of its own.
 - The WAD finder needs administrator rights and an active NTFS journal. Without them the button
   stays disabled and says why, instead of falling back to an hours-long disk sweep.
 - `pip_count` above `1` is implemented but has had little real use.
@@ -244,7 +247,7 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
 - [Compilando](#compilando)
 - [Como funciona](#como-funciona)
 - [Limitações conhecidas](#limitações-conhecidas)
-- [Licença](#licença-1)
+- [Licença](#licença)
 
 ## Recursos
 
@@ -275,7 +278,7 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
 
 | | |
 | --- | --- |
-| Sistema | Windows 10 ou 11 |
+| Sistema | Windows 10 ou 11 — no Linux, use a [branch `linux`](https://github.com/LightWolfMan/autodoom-pip/tree/linux) |
 | Jogo | Uma instalação do [AutoDoom](https://github.com/ioan-chera/AutoDoom), com `AutoDoom.exe` e as DLLs do SDL2 |
 | IWAD | Qualquer IWAD de Doom, Doom II, Final Doom, Heretic ou Freedoom |
 | Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — só para o launcher; o jogo não precisa de nada |
@@ -384,7 +387,10 @@ pensamento do bot.
 
 ## Limitações conhecidas
 
-- Só Windows, testado em build Release de 32 bits.
+- **O launcher** é só Windows, testado em build Release de 32 bits. A engine não: ela compila
+  e roda no Linux a partir do mesmo patch — veja a
+  [branch `linux`](https://github.com/LightWolfMan/autodoom-pip/tree/linux), que traz a receita
+  de build e um launcher GTK4 próprio.
 - O detector de WADs exige administrador e journal NTFS ativo. Sem isso o botão fica desabilitado
   e explica o motivo, em vez de cair numa varredura de horas.
 - `pip_count` maior que `1` está implementado, mas foi pouco usado de verdade.
