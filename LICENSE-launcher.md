@@ -14,6 +14,14 @@ mesmo patch acompanha este repositorio.
 Obra propria, escrita do zero em C# e PowerShell. Nao deriva do Eternity nem do
 AutoDoom, e nao esta coberta pela GPL acima. Distribuida sob a **licenca MIT**.
 
+## Icones da janela (launcher-src/Icons)
+
+Sao os **Fluent UI System Icons** da Microsoft, tambem sob **licenca MIT**,
+rasterizados a partir dos SVG originais de
+https://github.com/microsoft/fluentui-system-icons. O aviso de copyright da
+Microsoft acompanha a licenca daquele projeto; nenhuma marca da Microsoft e
+reivindicada aqui.
+
 ---
 
 MIT License

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 
@@ -76,10 +76,15 @@ internal sealed class MainForm : Form
 
    // Icones desenhados uma vez e guardados: Button.Image nao descarta o bitmap, e
    // gerar a cada repaint vazaria handle de GDI.
+   /// <summary>
+   /// Os cartoes da secao Extras, guardados so para igualar a altura de todos
+   /// depois que a janela mediu o texto.
+   /// </summary>
+   private readonly List<Control> _extraCards = [];
+
    private Bitmap? _icoFolder;
    private Bitmap? _icoScan;
    private Bitmap? _icoExit;
-   private Bitmap? _icoPlay;
    private Bitmap? _icoPlayWhite;
    private Bitmap? _icoOne;
    private Bitmap? _icoTwo;
@@ -165,215 +170,47 @@ internal sealed class MainForm : Form
    // ---------------------------------------------------------------- icones
 
    /// <summary>
-   /// Os icones sao desenhados num quadro logico de 16x16 e a matriz do Graphics
-   /// escala para o tamanho fisico: um so desenho serve para qualquer DPI.
+   /// Um icone Fluent na cor pedida, ja convertido para o tamanho fisico do
+   /// monitor. O desenho vem de `Icons/`; ver `FluentIcons.cs` para o porque de
+   /// eles serem mascaras pretas em vez de arte ja colorida.
    /// </summary>
-   private static Bitmap MakeIcon(int size, Action<Graphics> draw)
-   {
-      var bmp = new Bitmap(size, size);
-      using (Graphics g = Graphics.FromImage(bmp))
-      {
-         g.SmoothingMode = SmoothingMode.AntiAlias;
-         g.Clear(Color.Transparent);
-         g.ScaleTransform(size / 16f, size / 16f);
-         draw(g);
-      }
-      return bmp;
-   }
-
-   /// <summary>Bonequinho de cabeca e ombros, no quadro logico de 16x16.</summary>
-   private static void DrawPerson(Graphics g, float cx, float top, Color color)
-   {
-      using var brush = new SolidBrush(color);
-      g.FillEllipse(brush, cx - 2.3f, top + 2f, 4.6f, 4.6f);
-      g.FillPolygon(brush, new[]
-      {
-         new PointF(cx - 4.4f, top + 14f), new PointF(cx - 3.6f, top + 8.6f),
-         new PointF(cx + 3.6f, top + 8.6f), new PointF(cx + 4.4f, top + 14f),
-      });
-   }
+   private Bitmap? Glyph(string name, int logicalSize, Color color) =>
+      FluentIcons.Get(name, LogicalToDeviceUnits(logicalSize), color);
 
    private void BuildIcons()
    {
-      int size = LogicalToDeviceUnits(16);
-      Color stroke = SystemColors.ControlText;
+      // Botao segue a cor do texto do sistema; cartao e modo usam o azul de
+      // acento, que e o que separa o icone do rotulo ao lado sem pesar.
+      Color ink = SystemColors.ControlText;
 
-      _icoFolder = MakeIcon(size, g =>
-      {
-         using var back  = new SolidBrush(Color.FromArgb(226, 168, 38));
-         using var front = new SolidBrush(Color.FromArgb(255, 208, 94));
-         using var edge  = new Pen(Color.FromArgb(180, 128, 20), 1f);
+      _icoFolder = Glyph("folder", 16, ink);
+      _icoScan   = Glyph("scan",   16, ink);
+      _icoExit   = Glyph("exit",   16, ink);
 
-         // corpo da pasta, com a abinha do canto superior esquerdo
-         var body = new[]
-         {
-            new PointF(1f, 4f), new PointF(6f, 4f), new PointF(7.2f, 5.6f),
-            new PointF(14.6f, 5.6f), new PointF(14.6f, 13.4f), new PointF(1f, 13.4f),
-         };
-         g.FillPolygon(back, body);
-         g.DrawPolygon(edge, body);
+      // O "Jogar" e o botao primario azul: o triangulo so aparece em branco.
+      _icoPlayWhite = Glyph("play", 16, Color.White);
 
-         // aba da frente, inclinada: e o que faz a pasta parecer aberta
-         var flap = new[]
-         {
-            new PointF(3.1f, 7.4f), new PointF(15.4f, 7.4f),
-            new PointF(13.2f, 13.4f), new PointF(1f, 13.4f),
-         };
-         g.FillPolygon(front, flap);
-         g.DrawPolygon(edge, flap);
-      });
+      _icoOne = Glyph("person", 26, AccentColor);
+      _icoTwo = Glyph("people", 26, AccentColor);
 
-      _icoScan = MakeIcon(size, g =>
-      {
-         var page = new[]
-         {
-            new PointF(3f, 1.2f), new PointF(9.4f, 1.2f), new PointF(13.2f, 5f),
-            new PointF(13.2f, 14.8f), new PointF(3f, 14.8f),
-         };
-         using var white = new SolidBrush(Color.White);
-         using var gray  = new Pen(Color.FromArgb(130, 138, 148), 1f);
-         using var fold  = new SolidBrush(Color.FromArgb(214, 222, 232));
-         g.FillPolygon(white, page);
-         g.DrawPolygon(gray, page);
-         g.FillPolygon(fold, new[] { new PointF(9.4f, 1.2f), new PointF(13.2f, 5f), new PointF(9.4f, 5f) });
-         g.DrawPolygon(gray, new[] { new PointF(9.4f, 1.2f), new PointF(13.2f, 5f), new PointF(9.4f, 5f) });
+      _icoPip    = Glyph("pip",    28, AccentColor);
+      _icoWeapon = Glyph("weapon", 28, AccentColor);
+      _icoCamera = Glyph("camera", 28, AccentColor);
+      _icoJump   = Glyph("jump",   28, AccentColor);
+      _icoFire   = Glyph("fire",   28, AccentColor);
 
-         using var ink = new Pen(Color.FromArgb(48, 108, 190), 1.3f);
-         g.DrawLine(ink, 5f,  7.4f, 11.2f, 7.4f);
-         g.DrawLine(ink, 5f,  9.8f, 11.2f, 9.8f);
-         g.DrawLine(ink, 5f, 12.2f,  9.2f, 12.2f);
-      });
-
-      _icoExit = MakeIcon(size, g =>
-      {
-         // porta: tres lados, o lado direito fica aberto para a seta sair por ele
-         using var door = new Pen(stroke, 1.5f);
-         g.DrawLines(door, new[]
-         {
-            new PointF(8.4f, 2f), new PointF(2.2f, 2f),
-            new PointF(2.2f, 14f), new PointF(8.4f, 14f),
-         });
-
-         using var arrow = new Pen(Color.FromArgb(198, 62, 54), 1.7f);
-         g.DrawLine(arrow, 6.6f, 8f, 12.4f, 8f);
-         using var head = new SolidBrush(Color.FromArgb(198, 62, 54));
-         g.FillPolygon(head, new[]
-         {
-            new PointF(15f, 8f), new PointF(11.4f, 5f), new PointF(11.4f, 11f),
-         });
-      });
-
-      _icoPlay = MakeIcon(size, g =>
-      {
-         using var green = new SolidBrush(Color.FromArgb(38, 152, 70));
-         g.FillPolygon(green, new[]
-         {
-            new PointF(3.4f, 2f), new PointF(14f, 8f), new PointF(3.4f, 14f),
-         });
-      });
-
-      // O "Jogar" virou botao primario azul: um triangulo verde sumiria nele.
-      _icoPlayWhite = MakeIcon(size, g =>
-      {
-         using var white = new SolidBrush(Color.White);
-         g.FillPolygon(white, new[]
-         {
-            new PointF(3.4f, 2f), new PointF(14f, 8f), new PointF(3.4f, 14f),
-         });
-      });
-
-      int big = LogicalToDeviceUnits(28);
-      int card = LogicalToDeviceUnits(38);
-      _icoOne = MakeIcon(big, g => DrawPerson(g, 8f, 1f, AccentColor));
-      _icoTwo = MakeIcon(big, g =>
-      {
-         DrawPerson(g, 11.5f, 0.85f, Blend(AccentColor, SystemColors.Window, 0.45f));
-         DrawPerson(g, 5.5f,  0.95f, AccentColor);
-      });
-
-      _icoPip = MakeIcon(card, g =>
-      {
-         using var pen = new Pen(stroke, 1.2f);
-         g.DrawRectangle(pen, 1.5f, 3f, 13f, 10f);
-         using var inner = new SolidBrush(AccentColor);
-         g.FillRectangle(inner, 8.5f, 7.5f, 5f, 5f);
-      });
-
-      _icoWeapon = MakeIcon(card, g =>
-      {
-         using var body = new SolidBrush(Blend(stroke, SystemColors.Window, 0.25f));
-         g.FillRectangle(body, 2f, 6.5f, 9f, 2.6f);
-         g.FillRectangle(body, 4.5f, 9.1f, 2.4f, 4f);
-         using var barrel = new SolidBrush(AccentColor);
-         g.FillRectangle(barrel, 11f, 7f, 3.5f, 1.6f);
-      });
-
-      _icoCamera = MakeIcon(card, g =>
-      {
-         using var body = new SolidBrush(Blend(stroke, SystemColors.Window, 0.2f));
-         g.FillRectangle(body, 1.5f, 5f, 9.5f, 7f);
-         g.FillPolygon(body, new[]
-         {
-            new PointF(11.5f, 7.5f), new PointF(14.5f, 5.5f),
-            new PointF(14.5f, 11.5f), new PointF(11.5f, 9.5f),
-         });
-         using var lens = new SolidBrush(AccentColor);
-         g.FillEllipse(lens, 4.4f, 7f, 3.4f, 3.4f);
-      });
-
-      _icoJump = MakeIcon(card, g =>
-      {
-         DrawPerson(g, 8f, -1.4f, AccentColor);
-         using var ground = new Pen(Blend(stroke, SystemColors.Window, 0.4f), 1.4f);
-         g.DrawLine(ground, 2.5f, 14.2f, 13.5f, 14.2f);
-      });
-
-      _icoFire = MakeIcon(card, g =>
-      {
-         using var flame = new SolidBrush(Color.FromArgb(214, 96, 40));
-         g.FillPolygon(flame, new[]
-         {
-            new PointF(8f, 1.5f), new PointF(12.2f, 6.5f), new PointF(13f, 10.5f),
-            new PointF(10.6f, 14.2f), new PointF(5.4f, 14.2f), new PointF(3f, 10.5f),
-            new PointF(4.2f, 6f),
-         });
-         using var core = new SolidBrush(Color.FromArgb(248, 196, 64));
-         g.FillPolygon(core, new[]
-         {
-            new PointF(8f, 6.5f), new PointF(10.4f, 10.2f),
-            new PointF(8f, 13.6f), new PointF(5.6f, 10.2f),
-         });
-      });
-
-      // Reserva para o IWAD que nao entrega logo: um cartucho generico.
-      _icoWad = MakeIcon(LogicalToDeviceUnits(24), g =>
-      {
-         using var body = new SolidBrush(Blend(AccentColor, SystemColors.Window, 0.55f));
-         g.FillRectangle(body, 2f, 2.5f, 12f, 11f);
-         using var edge = new Pen(AccentColor, 1f);
-         g.DrawRectangle(edge, 2f, 2.5f, 12f, 11f);
-         using var label = new SolidBrush(SystemColors.Window);
-         g.FillRectangle(label, 4f, 4.5f, 8f, 4f);
-      });
+      // Reserva para o IWAD que nao entrega logo proprio.
+      _icoWad = Glyph("wad", 24, Blend(AccentColor, SystemColors.Window, 0.25f));
    }
 
    protected override void Dispose(bool disposing)
    {
       if (disposing)
       {
-         _icoFolder?.Dispose();
-         _icoScan?.Dispose();
-         _icoExit?.Dispose();
-         _icoPlay?.Dispose();
-         _icoPlayWhite?.Dispose();
-         _icoOne?.Dispose();
-         _icoTwo?.Dispose();
-         _icoPip?.Dispose();
-         _icoWeapon?.Dispose();
-         _icoCamera?.Dispose();
-         _icoJump?.Dispose();
-         _icoFire?.Dispose();
-         _icoWad?.Dispose();
+         // Os icones NAO entram aqui: quem e dono deles e o cache do
+         // FluentIcons, que devolve o mesmo bitmap para todo mundo que pedir a
+         // mesma cor e tamanho. Descartar aqui deixaria o cache com handle
+         // morto na mao.
          _boldFont?.Dispose();
          _sectionFont?.Dispose();
          _titleFont?.Dispose();
@@ -483,6 +320,7 @@ internal sealed class MainForm : Form
       Size        = new Size(LogicalToDeviceUnits(1250), LogicalToDeviceUnits(880));
       CenterToScreen();
 
+      EqualizeExtraCards();
       RefreshDetectAvailability();
       PruneStoredPwads();
       UpdateIwadDetails();
@@ -896,6 +734,8 @@ internal sealed class MainForm : Form
       for (int i = 0; i < 3; i++)
          grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
+      _extraCards.AddRange([pip, weapons, camera, jump, fire]);
+
       grid.Controls.Add(pip,     0, 0);
       grid.Controls.Add(weapons, 1, 0);
       grid.Controls.Add(camera,  0, 1);
@@ -914,6 +754,26 @@ internal sealed class MainForm : Form
       };
 
       return MakeSection(Strings.GroupExtras, grid, fill: false, pad: 8);
+   }
+
+   /// <summary>
+   /// Deixa todos os cartoes de Extras com a altura do mais alto. Sem isto o da
+   /// camera fica um degrau mais baixo que os vizinhos, porque tem uma linha de
+   /// texto a menos: o AutoSize mede cada cartao sozinho e nao sabe dos outros.
+   /// Roda depois do Load, quando o texto ja foi medido na fonte e na escala
+   /// reais -- medir antes daria a altura do layout de projeto, nao a da tela.
+   /// </summary>
+   private void EqualizeExtraCards()
+   {
+      int tallest = 0;
+      foreach (Control card in _extraCards)
+         tallest = Math.Max(tallest, card.PreferredSize.Height);
+
+      if (tallest <= 0)
+         return;
+
+      foreach (Control card in _extraCards)
+         card.MinimumSize = new Size(card.MinimumSize.Width, tallest);
    }
 
    /// <summary>
@@ -937,7 +797,9 @@ internal sealed class MainForm : Form
       {
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Dock         = DockStyle.Fill,
+         // Sem Top nem Bottom: o WinForms centra na vertical o que so esta preso
+         // pelos lados, e e assim que o texto fica no meio do cartao esticado.
+         Anchor       = AnchorStyles.Left | AnchorStyles.Right,
          Margin       = new Padding(0),
       };
 
@@ -978,7 +840,9 @@ internal sealed class MainForm : Form
       inner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
       inner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
       inner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      // Linha elastica em vez de AutoSize: e ela que sobra quando o cartao e
+      // esticado para a altura comum, e e nela que o conteudo se centra.
+      inner.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
       if (check is not null)
          inner.Controls.Add(check, 0, 0);
@@ -1110,7 +974,8 @@ internal sealed class MainForm : Form
          WrapContents  = false,
          AutoSize      = true,
          AutoSizeMode  = AutoSizeMode.GrowAndShrink,
-         Anchor        = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+         // Centrados na altura da lista, nao grudados no topo.
+         Anchor        = AnchorStyles.Left | AnchorStyles.Right,
          Margin        = new Padding(0, 0, LogicalToDeviceUnits(12), 0),
       };
       side.Controls.Add(browse);
@@ -1148,9 +1013,14 @@ internal sealed class MainForm : Form
       _detName.Anchor    = AnchorStyles.None;
       _detName.Margin    = new Padding(0, 0, 0, LogicalToDeviceUnits(10));
 
+      // Ancorado pelos lados em vez de Dock=Fill: a ficha e mais baixa que a
+      // lista ao lado, e assim ela fica no meio da altura do cartao em vez de
+      // pendurada no topo.
       var panel = new TableLayoutPanel
       {
-         Dock        = DockStyle.Fill,
+         Anchor      = AnchorStyles.Left | AnchorStyles.Right,
+         AutoSize    = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
          ColumnCount = 2,
          RowCount    = 7,
          Margin      = new Padding(0),
@@ -1445,8 +1315,12 @@ internal sealed class MainForm : Form
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
          Margin       = new Padding(0),
       };
-      row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      // Tres colunas com as pontas do mesmo tamanho: o par de botoes fica no
+      // centro da janela, e a mensagem de estado ocupa a folga da esquerda.
+      row.ColumnCount = 3;
+      row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
       row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
       row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
       row.Controls.Add(_lblStatus, 0, 0);
       row.Controls.Add(buttons,    1, 0);
