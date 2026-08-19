@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AutoDoom Launcher
+Comment=Launch AutoDoom with bot companions and the picture-in-picture view
+Exec=autodoom-launcher
+Icon=net.autodoom.launcher
+Terminal=false
+Categories=Game;ActionGame;
+Keywords=doom;autodoom;eternity;bot;

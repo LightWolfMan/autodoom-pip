@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/github/downloads/LightWolfMan/autodoom-pip/total)](https://github.com/LightWolfMan/autodoom-pip/releases)
 [![Engine](https://img.shields.io/badge/engine-GPL--3.0-blue)](COPYING-GPLv3)
 [![Launcher](https://img.shields.io/badge/launcher-MIT-green)](LICENSE-launcher.md)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](#requirements)
+[![Platform](https://img.shields.io/badge/platform-Linux-orange)](#requirements)
 
 **English** · [Português](#português)
 
@@ -48,8 +48,10 @@ loose ends of running AutoDoom together.
   the game's translation tables, and flashes white when they take a hit. Health and ammo are
   printed under the box, in the same colour.
 - **Friendly fire switch** — co-op in Doom lets players hurt each other; you can turn that off.
-- **Launcher** — IWAD and PWAD pickers, a copilot switch, 0–3 bot companions, and a WAD finder
-  that reads the NTFS journal instead of walking the disk.
+- **Launcher** — a GTK4 skeleton lives in [`linux-launcher/`](linux-launcher); it already
+  builds the right command line and starts the game. Finding WADs uses `plocate`, the
+  practical answer here: `locate '*.wad'` answers in milliseconds, needs no privilege, and
+  ships on most Debian and Arch desktops.
 - **Nobody leaves without asking** — a bot that reaches the exit switch stops there and asks
   you, with the engine's own yes/no prompt. Say no and the level gets another minute before
   anyone asks again.
@@ -61,35 +63,66 @@ loose ends of running AutoDoom together.
   nothing to configure.
 - **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
 
-> **On this branch there is no launcher screenshot.** The launcher is WinForms, which does not
-> run on Linux, so nothing here could show it honestly. Porting it is step 2; see
-> [Building from source → On Linux](#on-linux) for what already works.
+<img src="docs/linux-launcher.png" alt="The GTK4 launcher skeleton running on Ubuntu 24.04" width="520">
+
+<sub>The GTK4 skeleton in <a href="linux-launcher"><code>linux-launcher/</code></a>. It opens,
+builds the right command line and starts the game; the PWAD picker and the IWAD details panel
+are still missing.</sub>
+
+### The keyboard layout
+
+Eternity boots the 1993 keyboard — arrows to walk, no WASD — and on Linux you get it fresh,
+because **none of your Windows bindings come along**: the engine starts from an empty profile
+and says `keys.csc not found, using defaults`.
+
+The project's layout is in [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc): `WASD` to
+move, `E` to use, `Ctrl` and `mouse1` to fire, `mouse2` for the alternate attack, `Space` to
+jump, `R` to reload, `Shift` to run, `Alt` to strafe, `F` for the scoreboard, `Backspace` for
+`bot_unstick` and `F12` to cycle the PIP occupant.
+
+```
+cp keys/autodoom-modern.csc ~/AutoDoom/user/doom/keys.csc   # with the game closed
+```
+
+The launcher skeleton does this for you, and only for profiles that have no `keys.csc` yet —
+an existing profile keeps its owner's keys.
 
 ## Requirements
 
 | | |
 | --- | --- |
-| OS | Windows 10/11, **or Linux** — the engine builds and runs there; the launcher does not (yet) |
-| Game | An existing [AutoDoom](https://github.com/ioan-chera/AutoDoom) install, with `AutoDoom.exe` and the SDL2 DLLs |
+| OS | Linux. Verified on Ubuntu 24.04; Debian and Arch are the targets |
+| Build | GCC 13+ or Clang, CMake 3.x, SDL2 + SDL2_mixer + SDL2_net development packages |
 | IWAD | Any Doom, Doom II, Final Doom, Heretic or Freedoom IWAD |
-| Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — for the launcher only; the game itself needs nothing extra |
-| Optional | Administrator rights and an NTFS volume with an active USN journal, for the WAD finder |
+| Launcher | Python 3.11+, PyGObject, GTK 4 and libadwaita — only for the launcher skeleton; the game needs none of it |
+| Optional | `plocate`, so the launcher can find WADs outside the usual folders |
 
 ## Installation
 
-1. Download **`AutoDoomPip-Setup.exe`** from the [latest release](https://github.com/LightWolfMan/autodoom-pip/releases/latest).
-2. Run it and point it at the folder that contains `AutoDoom.exe`. The installer refuses to
-   continue anywhere else.
-3. Launch **AutoDoom Launcher** from the Start menu.
+There is no binary release for Linux yet — you build it, and it takes one command.
 
-Prefer the command line? The release also ships a PowerShell installer:
+**Debian / Ubuntu**
 
-```powershell
-.\Install-AutoDoomPip.ps1 -Target "D:\Games\AutoDoom"
+```
+sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
 ```
 
-To uninstall, use *Apps & features* in Windows, or the shortcut in the Start menu folder. Your
-original `AutoDoom.exe` is never touched.
+**Arch**
+
+```
+sudo pacman -S --needed base-devel cmake git sdl2 sdl2_mixer sdl2_net plocate
+```
+
+Then:
+
+```
+git clone https://github.com/LightWolfMan/autodoom-pip.git -b linux
+./autodoom-pip/tools/build_linux.sh
+```
+
+The script clones AutoDoom, populates the `adlmidi` submodule, applies the patch and builds.
+Nothing is installed system-wide and nothing of yours is overwritten: the binary stays in the
+build tree until you decide where to put it.
 
 ## Usage
 
@@ -197,7 +230,7 @@ its own `user/` directory, so the engine boots with `keys.csc not found, using d
 none of the launcher's bindings exist there — no `F` for the scoreboard, no `Backspace` for
 `bot_unstick`. Bind them by hand for now; wiring that up is part of step 2.
 
-The launcher is Windows-only for now: WinForms does not run on Linux.
+The WinForms launcher from `main` does not run here; its GTK4 replacement lives in `linux-launcher/`.
 
 ## How it works
 
@@ -216,9 +249,10 @@ a player instead.
 
 ## Known limitations
 
-- Windows only, tested on a 32-bit Release build.
-- The WAD finder needs administrator rights and an active NTFS journal. Without them the button
-  stays disabled and says why, instead of falling back to an hours-long disk sweep.
+- The launcher is a skeleton: no PWAD picker, no IWAD details panel, no progress bar yet.
+- Finding WADs depends on `plocate`'s database. A WAD created after the last `updatedb` run is
+  invisible until the next one — run `sudo updatedb` if something is missing. There is no
+  equivalent to the NTFS journal here: ext4 keeps no queryable diary of file names.
 - `pip_count` above `1` is implemented but has had little real use.
 - No crouching: there is no crouch code anywhere in Eternity, only an unused ACS constant.
 
@@ -281,8 +315,10 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   das tabelas de tradução do próprio jogo, e pisca de branco quando ele leva dano. Vida e
   munição saem embaixo do quadro, na mesma cor.
 - **Fogo amigo** — no coop do Doom os jogadores se ferem; dá para desligar.
-- **Launcher** — escolha de IWAD e PWAD, interruptor de copiloto, 0 a 3 bots companheiros, e um detector de
-  WADs que lê o journal do NTFS em vez de varrer o disco.
+- **Launcher** — um esqueleto em GTK4 vive em [`linux-launcher/`](linux-launcher); ele já monta
+  a linha de comando certa e sobe o jogo. A busca de WADs usa `plocate`, que é a resposta
+  prática aqui: `locate '*.wad'` responde em milissegundos, não pede privilégio nenhum e vem
+  na maioria dos desktops Debian e Arch.
 - **Ninguém sai sem perguntar** — o bot que chega no botão da saída para ali e pergunta, com o
   mesmo diálogo de sim/não que a engine usa para sair do jogo. Diga não e o mapa ganha mais um
   minuto antes de alguém perguntar de novo.
@@ -294,35 +330,66 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   para configurar.
 - **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
 
-> **Nesta branch nao ha captura do launcher.** Ele e WinForms, que nao roda no Linux, entao
-> nada aqui poderia mostra-lo com honestidade. Porta-lo e a etapa 2; veja
-> [Compilando → No Linux](#no-linux) para o que ja funciona.
+<img src="docs/linux-launcher.png" alt="O esqueleto do launcher GTK4 rodando no Ubuntu 24.04" width="520">
+
+<sub>O esqueleto em GTK4 que vive em <a href="linux-launcher"><code>linux-launcher/</code></a>.
+Ele abre, monta a linha de comando certa e sobe o jogo; falta o seletor de PWAD e a ficha do
+IWAD.</sub>
+
+### O teclado
+
+A engine sobe com o teclado de 1993 — setas para andar, sem WASD — e no Linux você pega ele
+zerado, porque **nenhum bind do Windows vem junto**: o perfil começa vazio e a engine avisa
+`keys.csc not found, using defaults`.
+
+O teclado do projeto está em [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc): `WASD`
+para andar, `E` para usar, `Ctrl` e `mouse1` para atirar, `mouse2` para o tiro alternativo,
+`Espaço` para pular, `R` para recarregar, `Shift` para correr, `Alt` para strafe, `F` para o
+placar, `Backspace` para o `bot_unstick` e `F12` para girar quem aparece no quadrinho.
+
+```
+cp keys/autodoom-modern.csc ~/AutoDoom/user/doom/keys.csc   # com o jogo fechado
+```
+
+O esqueleto do launcher já faz isso sozinho, e só em perfil que ainda não tem `keys.csc` —
+perfil existente mantém as teclas do dono.
 
 ## Requisitos
 
 | | |
 | --- | --- |
-| Sistema | Windows 10/11, **ou Linux** — a engine compila e roda; o launcher ainda nao |
-| Jogo | Uma instalação do [AutoDoom](https://github.com/ioan-chera/AutoDoom), com `AutoDoom.exe` e as DLLs do SDL2 |
+| Sistema | Linux. Verificado na Ubuntu 24.04; o alvo são Debian e Arch |
+| Build | GCC 13+ ou Clang, CMake 3.x, pacotes de desenvolvimento do SDL2, SDL2_mixer e SDL2_net |
 | IWAD | Qualquer IWAD de Doom, Doom II, Final Doom, Heretic ou Freedoom |
-| Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — só para o launcher; o jogo não precisa de nada |
-| Opcional | Direitos de administrador e volume NTFS com journal ativo, para o detector de WADs |
+| Launcher | Python 3.11+, PyGObject, GTK 4 e libadwaita — só para o esqueleto do launcher; o jogo não precisa de nada disso |
+| Opcional | `plocate`, para o launcher achar WAD fora das pastas usuais |
 
 ## Instalação
 
-1. Baixe o **`AutoDoomPip-Setup.exe`** na [última release](https://github.com/LightWolfMan/autodoom-pip/releases/latest).
-2. Rode e aponte para a pasta que contém o `AutoDoom.exe`. O instalador se recusa a continuar em
-   qualquer outro lugar.
-3. Abra o **AutoDoom Launcher** pelo Menu Iniciar.
+Ainda não há release binária para Linux — aqui você compila, e é um comando.
 
-Pela linha de comando:
+**Debian / Ubuntu**
 
-```powershell
-.\Install-AutoDoomPip.ps1 -Target "D:\Jogos\AutoDoom"
+```
+sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
 ```
 
-Para desinstalar, use *Aplicativos e recursos* do Windows. O seu `AutoDoom.exe` original nunca é
-tocado.
+**Arch**
+
+```
+sudo pacman -S --needed base-devel cmake git sdl2 sdl2_mixer sdl2_net plocate
+```
+
+Depois:
+
+```
+git clone https://github.com/LightWolfMan/autodoom-pip.git -b linux
+./autodoom-pip/tools/build_linux.sh
+```
+
+O script clona o AutoDoom, popula o submódulo `adlmidi`, aplica o patch e compila. Nada é
+instalado no sistema e nada seu é sobrescrito: o binário fica na árvore de build até você
+decidir onde colocá-lo.
 
 ## Como usar
 
@@ -406,7 +473,7 @@ Um cuidado: o `cmake_minimum_required (VERSION 2.6)` é só um aviso no CMake 3.
 que o launcher escreve existe lá — nem o `F` do placar, nem o `Backspace` do `bot_unstick`.
 Por enquanto é amarrar na mão; automatizar isso faz parte da etapa 2.
 
-O launcher, por enquanto, é só Windows: WinForms não roda no Linux.
+O launcher WinForms da `main` não roda aqui; o substituto em GTK4 está em `linux-launcher/`.
 
 ## Como funciona
 
@@ -422,9 +489,10 @@ pensamento do bot.
 
 ## Limitações conhecidas
 
-- Só Windows, testado em build Release de 32 bits.
-- O detector de WADs exige administrador e journal NTFS ativo. Sem isso o botão fica desabilitado
-  e explica o motivo, em vez de cair numa varredura de horas.
+- O launcher é um esqueleto: ainda sem seletor de PWAD, sem ficha do IWAD e sem barra de progresso.
+- A busca de WADs depende do banco do `plocate`. Um WAD criado depois do último `updatedb` fica
+  invisível até o próximo — rode `sudo updatedb` se faltar algo. Não há equivalente ao journal
+  do NTFS aqui: o ext4 não guarda um diário de nomes consultável.
 - `pip_count` maior que `1` está implementado, mas foi pouco usado de verdade.
 - Não há agachamento: não existe código de crouch no Eternity, apenas uma constante de ACS sem uso.
 

@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""Ponto de entrada: `./autodoom-launcher [pasta-do-jogo]`."""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from autodoom_launcher.window import LauncherApp, default_game_dir
+
+
+def main() -> int:
+    game_dir = sys.argv[1] if len(sys.argv) > 1 else default_game_dir()
+    return LauncherApp(game_dir).run([sys.argv[0]])
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

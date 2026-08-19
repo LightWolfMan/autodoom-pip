@@ -1,3 +1,6 @@
-# Script de build roda no Linux: CRLF quebraria o shebang
-# ("/bin/bash^M: bad interpreter"), entao ele fica sempre em LF.
-*.sh text eol=lf
+# Estes arquivos rodam no Linux: CRLF quebraria o shebang
+# ("/bin/bash^M: bad interpreter") e sujaria o .desktop.
+*.sh              text eol=lf
+*.py              text eol=lf
+*.desktop         text eol=lf
+linux-launcher/autodoom-launcher text eol=lf
