@@ -187,22 +187,30 @@ class LauncherWindow(Adw.ApplicationWindow):
             self._copilot, "bot", "Copiloto",
             "O bot joga o seu personagem e devolve o controle quando você mexe"))
 
-        self._companions = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 3, 1)
-        self._companions.set_draw_value(False)
-        self._companions.set_hexpand(True)
+        # Um unico Gtk.Adjustment para o slider e o spinner. Antes eram dois
+        # valores espelhados na mao, com uma trava para nao se chamarem em
+        # cascata; compartilhando o adjustment nao ha o que sincronizar -- os
+        # dois controles sao vistas do mesmo numero, e a trava sumiu junto.
+        self._bots = Gtk.Adjustment(lower=0, upper=3, step_increment=1, page_increment=1,
+                                    value=self._settings.get("companions", 1))
+        self._bots.connect("value-changed", self._on_bots_changed)
+
+        self._companions = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
+                                     adjustment=self._bots, draw_value=False, hexpand=True)
+        # Sem isto o arrasto para no meio do caminho: o Gtk.Scale trabalha em
+        # ponto flutuante e a alca ficaria entre duas marcas, mostrando 1 no
+        # spinner enquanto aponta para 1,4. Com round_digits 0 ela so descansa
+        # em numero inteiro, que e o unico valor que a engine aceita.
+        self._companions.set_round_digits(0)
+        self._companions.set_digits(0)
+        # Rolar o mouse e clicar numa marca passam a valer um passo cheio.
+        self._companions.set_increments(1, 1)
         for i in range(4):
             self._companions.add_mark(i, Gtk.PositionType.BOTTOM, str(i))
 
-        self._spin = Gtk.SpinButton.new_with_range(0, 3, 1)
-        self._spin.set_valign(Gtk.Align.CENTER)
-
-        # Uma fonte de verdade: o slider. O spinner espelha, e a trava impede
-        # que um chame o outro em cascata.
-        self._syncing = False
-        self._companions.connect("value-changed", self._on_slider)
-        self._spin.connect("value-changed", self._on_spin)
-        self._companions.set_value(self._settings.get("companions", 1))
-        self._spin.set_value(self._companions.get_value())
+        self._spin = Gtk.SpinButton(adjustment=self._bots, climb_rate=1, digits=0,
+                                    numeric=True, snap_to_ticks=True,
+                                    valign=Gtk.Align.CENTER)
 
         slider_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         slider_row.append(self._companions)
@@ -215,24 +223,27 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         return self._section("Modo", "gamepad", grid)
 
-    def _on_slider(self, scale: Gtk.Scale) -> None:
-        if self._syncing:
+    def _on_bots_changed(self, adjustment: Gtk.Adjustment) -> None:
+        # O round_digits arredonda o que o usuario arrasta, mas nao o que o
+        # codigo escreve: o valor restaurado das preferencias, por exemplo,
+        # poderia entrar quebrado e deixar a alca entre duas marcas com o
+        # spinner mostrando outro numero. Arredondar aqui fecha os dois casos.
+        # Nao ha recursao: na segunda passada o valor ja e inteiro e o GTK so
+        # emite o sinal quando ele muda de verdade.
+        value = adjustment.get_value()
+        rounded = round(value)
+        if value != rounded:
+            adjustment.set_value(rounded)
             return
-        self._syncing = True
-        self._spin.set_value(round(scale.get_value()))
-        self._syncing = False
+
         self._update_hint()
 
-    def _on_spin(self, spin: Gtk.SpinButton) -> None:
-        if self._syncing:
-            return
-        self._syncing = True
-        self._companions.set_value(spin.get_value())
-        self._syncing = False
-        self._update_hint()
+    def _companion_count(self) -> int:
+        """O valor que vai para a linha de comando: inteiro, sempre."""
+        return int(round(self._bots.get_value()))
 
     def _update_hint(self) -> None:
-        count = int(self._spin.get_value())
+        count = self._companion_count()
         first = ("O bot dirige o seu personagem e solta o controle a cada toque seu nas teclas."
                  if self._copilot.get_active()
                  else "Sem copiloto: você joga o seu personagem do início ao fim.")
@@ -462,7 +473,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         opts = Options(
             iwad=iwad.path,
             copilot=self._copilot.get_active(),
-            companions=int(self._spin.get_value()),
+            companions=self._companion_count(),
             pip=self._pip.get_active(),
             weapons_stay_off=self._weapons.get_active(),
             pwad=self._pwad_path if self._pwad.get_selected() == 0 else None,
