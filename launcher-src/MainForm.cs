@@ -1928,6 +1928,9 @@ internal sealed class MainForm : Form
       // o jogo fechado, e o unico momento em que a mudanca sobrevive. O placar
       // deixou de ser opcao e vai sempre ligado.
       GameConfig.SetJump(_gameDir, _cbJump.Checked);
+      // Perfil novo nasce com o teclado do projeto; perfil que ja existe so
+      // ganha o bind do bot_unstick, sem perder o que o dono escolheu.
+      GameConfig.EnsureProjectKeys(_gameDir);
       GameConfig.EnsureUnstickBind(_gameDir);
       GameConfig.SetPipFollow(_gameDir, Math.Max(_cbFollow.SelectedIndex, 0));
       GameConfig.SetFriendlyFire(_gameDir, _cbFriendly.Checked);

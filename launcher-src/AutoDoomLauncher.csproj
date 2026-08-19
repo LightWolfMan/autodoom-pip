@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -19,6 +19,8 @@
   <ItemGroup>
     <!-- Icones Fluent (Microsoft, MIT) rasterizados; ver FluentIcons.cs -->
     <EmbeddedResource Include="Icons\*.png" />
+    <!-- Teclado padrao do projeto; ver GameConfig.EnsureProjectKeys -->
+    <EmbeddedResource Include="Keys\*.csc" />
   </ItemGroup>
 
 </Project>

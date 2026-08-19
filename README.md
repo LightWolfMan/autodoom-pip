@@ -111,6 +111,18 @@ In game:
 | `F12` | Move the PIP box to the next player, for ten seconds |
 | `Space` | Jump, when enabled in the launcher |
 
+### The keyboard layout
+
+Eternity still ships the 1993 keyboard: arrows to walk, no WASD. This project carries a
+modern one in [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc) — `WASD` to move, `E`
+to use, `Ctrl` and `mouse1` to fire, `mouse2` for the alternate attack, `Space` to jump,
+`R` to reload, `Shift` to run, `Alt` to strafe, plus the four keys above.
+
+The launcher writes it into any profile that has **no** `keys.csc` yet. A profile that
+already exists is left alone — your own keys are yours — and only gains the `Backspace`
+binding, which is added without removing anything. To adopt it by hand, copy the file over
+`user/<game>/keys.csc` with the game closed; the engine rewrites that file on exit.
+
 <img src="docs/scoreboard.png" alt="The co-op scoreboard ranked by kills, with the PIP box visible" width="720">
 
 ## Configuration
@@ -306,6 +318,19 @@ No jogo:
 | `Backspace` | Destrava os bots, empurrando todos para trás |
 | `F12` | Passa o quadrinho para o próximo jogador, por dez segundos |
 | `Espaço` | Pular, quando ligado no launcher |
+
+### O teclado
+
+A engine ainda entrega o teclado de 1993: setas para andar, sem WASD. O projeto carrega um
+moderno em [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc) — `WASD` para andar, `E`
+para usar, `Ctrl` e `mouse1` para atirar, `mouse2` para o tiro alternativo, `Espaço` para
+pular, `R` para recarregar, `Shift` para correr, `Alt` para strafe, mais as quatro teclas
+da tabela acima.
+
+O launcher escreve esse arquivo em qualquer perfil que **ainda não tenha** `keys.csc`. Perfil
+que já existe fica intacto — as suas teclas são suas — e só ganha o bind do `Backspace`, que
+é acrescentado sem apagar nada. Para adotar na mão, copie o arquivo por cima do
+`user/<jogo>/keys.csc` com o jogo fechado; a engine reescreve esse arquivo ao sair.
 
 ## Configuração
 

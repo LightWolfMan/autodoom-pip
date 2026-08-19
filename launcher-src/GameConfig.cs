@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace AutoDoomLauncher;
 
@@ -87,6 +87,61 @@ internal static class GameConfig
    {
       foreach (string profile in Profiles(gameDir))
          AddBind(Path.Combine(profile, "keys.csc"), "bind backspace \"bot_unstick\"");
+   }
+
+   // ------------------------------------------------- teclado do projeto
+
+   /// <summary>
+   /// O layout de teclas do projeto: WASD para andar, E para usar, Ctrl e
+   /// mouse1 para atirar, mouse2 para o tiro alternativo, espaco para pular, R
+   /// para recarregar, shift para correr, alt para strafe, F para o placar,
+   /// Backspace para destravar os bots e F12 para girar quem aparece no
+   /// quadrinho. E o mesmo esquema dos FPS modernos; a engine, sozinha, ainda
+   /// entrega o teclado de 1993, com as setas andando e sem WASD.
+   ///
+   /// So escreve em perfil que **ainda nao tem** `keys.csc`. Quem ja jogou tem
+   /// as proprias teclas, e sobrescrever isso sem pedir seria trocar a
+   /// configuracao de alguem por conta propria -- para esse caso continua
+   /// valendo o `EnsureUnstickBind`, que acrescenta sem apagar nada.
+   /// </summary>
+   public static void EnsureProjectKeys(string gameDir)
+   {
+      string? layout = ReadEmbeddedLayout();
+      if (layout is null)
+         return;
+
+      foreach (string profile in Profiles(gameDir))
+      {
+         string keys = Path.Combine(profile, "keys.csc");
+         try
+         {
+            if (File.Exists(keys))
+               continue;
+            File.WriteAllText(keys, layout);
+         }
+         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+         {
+            // perfil somente leitura nao pode impedir o jogo de subir
+         }
+      }
+   }
+
+   private static string? ReadEmbeddedLayout()
+   {
+      try
+      {
+         using Stream? stream = typeof(GameConfig).Assembly
+            .GetManifestResourceStream("AutoDoomLauncher.Keys.autodoom-modern.csc");
+         if (stream is null)
+            return null;
+
+         using var reader = new StreamReader(stream);
+         return reader.ReadToEnd();
+      }
+      catch (Exception e) when (e is IOException or ArgumentException)
+      {
+         return null;
+      }
    }
 
    // -------------------------------------------------------- fogo amigo
