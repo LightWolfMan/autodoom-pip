@@ -1,0 +1,3 @@
+# Script de build roda no Linux: CRLF quebraria o shebang
+# ("/bin/bash^M: bad interpreter"), entao ele fica sempre em LF.
+*.sh text eol=lf

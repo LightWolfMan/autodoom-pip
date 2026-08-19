@@ -162,6 +162,34 @@ Two things that cost an afternoon:
 The launcher builds with `dotnet publish -c Release -r win-x64 --self-contained false
 -p:PublishSingleFile=true`; its source is in [`launcher-src/`](launcher-src).
 
+### On Linux
+
+The engine needs no porting — Eternity ships a full `CMakeLists.txt`, and this patch touches
+no Windows API: it uses `fopen`, `fprintf` and the engine's own `psnprintf`. `b_vote.cpp`
+joins the build by itself, because `source/CMakeLists.txt` collects sources with
+`FILE (GLOB autodoom/*.cpp)` — only the MSVC `.vcxproj` needed a hand-written line, and
+Linux never reads it.
+
+```
+sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev
+git clone --branch AutoDoom https://github.com/ioan-chera/AutoDoom.git && cd AutoDoom
+git submodule update --init --recursive
+git apply /path/to/autodoom-pip.patch
+mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+ln -s ../../base source/base       # the engine wants base/ next to the binary
+```
+
+[`tools/build_linux.sh`](tools/build_linux.sh) does all of that. Verified on Ubuntu 24.04
+(CMake 3.28.3, GCC 13.3, SDL2 2.30): the patch applied clean, the build finished with **zero
+errors**, and the running game showed the PIP box and the exit vote. The copilot was measured
+the same way as on Windows — 76.4% of pixels changing over five seconds with `-copilot 1`
+against 0.0% with `-copilot 0`.
+
+One thing to watch: `cmake_minimum_required (VERSION 2.6)` is only a warning under CMake 3.x
+but an **error under CMake 4**, which newer distributions ship.
+
+The launcher is Windows-only for now: WinForms does not run on Linux.
+
 ## How it works
 
 `R_RenderPlayerView` clears every buffer it uses on entry — clip segs, draw segs, planes,
@@ -344,6 +372,25 @@ msbuild vc2019\Eternity.sln /p:Configuration=Release /p:Platform=Win32 ^
 Duas pedras que custaram uma tarde: o submódulo **`adlmidi` precisa estar populado**
 (`git submodule update --init`), e **compile em Win32** — um build x64 ao lado das DLLs de 32
 bits do AutoDoom morre com `0xc000007b`.
+
+### No Linux
+
+A engine não precisa de porte — o Eternity traz um `CMakeLists.txt` completo, e este patch não
+usa **nenhuma** API do Windows: só `fopen`, `fprintf` e o `psnprintf` da própria engine. O
+`b_vote.cpp` entra no build sozinho, porque o `source/CMakeLists.txt` monta a lista com
+`FILE (GLOB autodoom/*.cpp)` — o único lugar que precisou de linha manual foi o `.vcxproj` do
+MSVC, que no Linux ninguém lê.
+
+O [`tools/build_linux.sh`](tools/build_linux.sh) faz o caminho inteiro: dependências,
+submódulo, patch e build. Verificado numa Ubuntu 24.04 (CMake 3.28.3, GCC 13.3, SDL2 2.30) —
+o patch aplicou limpo, o build terminou com **zero erros** e o jogo rodando mostrou o
+quadrinho do PIP e a votação de saída na tela. O copiloto foi medido como no Windows: **76,4%**
+dos pixels mudando em cinco segundos com `-copilot 1`, contra **0,0%** com `-copilot 0`.
+
+Um cuidado: o `cmake_minimum_required (VERSION 2.6)` é só um aviso no CMake 3.x, mas vira
+**erro no CMake 4**, que as distribuições novas já trazem.
+
+O launcher, por enquanto, é só Windows: WinForms não roda no Linux.
 
 ## Como funciona
 
