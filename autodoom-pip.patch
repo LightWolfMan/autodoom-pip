@@ -1,168 +1,484 @@
-diff --git a/source/d_main.cpp b/source/d_main.cpp
-index 88b20bf..1a6e893 100644
---- a/source/d_main.cpp
-+++ b/source/d_main.cpp
-@@ -571,6 +571,94 @@ void D_DrawWings()
-    }
- }
- 
+diff --git a/source/autodoom/b_think.cpp b/source/autodoom/b_think.cpp
+index cfefd513..1d736dbe 100644
+--- a/source/autodoom/b_think.cpp
++++ b/source/autodoom/b_think.cpp
+@@ -33,6 +33,7 @@
+ #include "b_itemlearn.h"
+ #include "b_statistics.h"
+ #include "b_think.h"
++#include "b_vote.h"
+ #include "b_util.h"
+ #include "b_vocabulary.h"
+ #include "b_weapon.h"
+@@ -238,6 +239,14 @@ Bot::SpecialChoice Bot::shouldUseSpecial(const line_t& line, const BSubsec& line
+         // FIXME: consider going immediately if the usual case is doomed to fail for any reason
+         if(m_searchstage >= stage)
+         {
++           // Interruptor de saida: deixa o bot caminhar ate la. Quem segura o
++           // dedo e o momento de apertar, la em doCommand -- assim a pergunta
++           // so aparece com ele parado na sala da saida, e nao a um mapa de
++           // distancia. Linha de passagem nao tem esse momento, entao continua
++           // sendo barrada aqui mesmo.
++           if(!EV_IsSwitchSpecial(line) && !B_RequestExitVote(static_cast<int>(pl - players)))
++              return SpecialChoice_no;
++
+            if(shouldChat(URGENT_CHAT_INTERVAL_SEC, m_lastExitMessage))
+            {
+               m_lastExitMessage = gametic;
+@@ -1481,7 +1490,13 @@ void Bot::doNonCombatAI()
+         EV_IsSwitchSpecial(*m_path.end.walkLine) && B_checkSwitchReach(mpos, endCoord, *swline))
+     {
+         m_intoSwitch = true;
+-        if(gametic % 2 == 0)
++
++        // Chegou no botao. Se for a saida, pergunta antes; enquanto nao houver
++        // um sim, fica parado ali em vez de apertar.
++        const bool exitHeld = B_LineIsExit(*m_path.end.walkLine) &&
++                              !B_RequestExitVote(static_cast<int>(pl - players));
++
++        if(!exitHeld && gametic % 2 == 0)
+             cmd->buttons |= BT_USE;
+     }
+     else if(doorss)
+diff --git a/source/autodoom/b_vote.cpp b/source/autodoom/b_vote.cpp
+new file mode 100644
+index 00000000..0802d4b5
+--- /dev/null
++++ b/source/autodoom/b_vote.cpp
+@@ -0,0 +1,233 @@
++// Emacs style mode select   -*- C++ -*-
++//-----------------------------------------------------------------------------
 +//
-+// D_drawPipView
++// Copyright (C) 2026 AutoDoom contributors
 +//
-+// Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
-+// principal e antes do HUD, que fica por cima de proposito.
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
 +//
-+static void D_drawPipView()
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++//--------------------------------------------------------------------------
++//
++// DESCRIPTION:
++//   Exit approval. No bot ends the map on its own: the one who wants to leave
++//   asks, with the same yes/no prompt the engine uses for quitting. Say no and
++//   the level gets another minute before anyone asks again.
++//
++//   An earlier version had the bots vote among themselves on kill and item
++//   percentages. It always passed 3-0 -- with items at 100% every bot agreed
++//   regardless of the rest -- so it was a rubber stamp, not a decision. The one
++//   who cares whether the map is done is the person holding the keyboard, so
++//   the decision went there.
++//
++//-----------------------------------------------------------------------------
++
++#include "../z_zone.h"
++
++#include "../c_runcmd.h"
++#include "../d_gi.h"
++#include "../d_player.h"
++#include "../doomstat.h"
++#include "../g_game.h"
++#include "../hu_stuff.h"
++#include "../ev_actions.h"
++#include "../ev_specials.h"
++#include "../m_qstr.h"
++#include "../mn_misc.h"
++#include "../s_sound.h"
++#include "b_think.h"
++#include "b_vote.h"
++
++// Diario em vote.log, ao lado do executavel. Serve para conferir o que
++// aconteceu quando a pergunta some da tela antes de alguem ver.
++int bot_exitvote_log = 0;
++
++static void B_voteLog(const char *fmt, ...)
 +{
-+   if(!pip_active || gamestate != GS_LEVEL || automapactive)
++   if(!bot_exitvote_log)
 +      return;
 +
-+   // Ranking por fragos/mortes: quem mais mata aparece primeiro. E o criterio
-+   // automatico; o F12 empresta o lugar por 10 segundos e depois devolve.
-+   int order[MAXPLAYERS];
-+   int count = 0;
++   FILE *f = fopen("vote.log", "a");
++   if(!f)
++      return;
 +
++   va_list args;
++   va_start(args, fmt);
++   fprintf(f, "[tic %7d] ", gametic);
++   vfprintf(f, fmt, args);
++   fputc(10, f);
++   va_end(args);
++   fclose(f);
++}
++
++int bot_exitvote       = 1;    // liga o pedido de autorizacao
++int bot_exitvote_delay = 60;   // segundos de espera depois de um "nao"
++
++// Pergunta sem resposta conta como recusa depois deste tempo. Sem isso, fechar
++// o dialogo por outro caminho deixaria a saida travada para sempre.
++static const int ANSWER_TIMEOUT_SECONDS = 30;
++
++static bool s_approved;      // saida ja liberada nesta partida
++static bool s_asking;        // pergunta na tela agora
++static int  s_askDeadline;   // gametic em que a pergunta expira
++static int  s_blockedUntil;  // gametic ate o qual ninguem pergunta de novo
++
++void B_VoteMapInit()
++{
++   B_voteLog("--- mapa novo ---");
++   s_approved     = false;
++   s_asking       = false;
++   s_askDeadline  = 0;
++   s_blockedUntil = 0;
++}
++
++//
++// A linha termina o mapa? Mesma lista que o bot usa para reconhecer saida.
++//
++bool B_LineIsExit(const line_t &line)
++{
++   if(!line.special)
++      return false;
++
++   const ev_action_t *action = EV_ActionForSpecialOrGen(line.special);
++   if(!action)
++      return false;
++
++   const EVActionFunc func = action->action;
++   return func == EV_ActionExitLevel       || func == EV_ActionSwitchExitLevel ||
++          func == EV_ActionGunExitLevel    || func == EV_ActionParamExitNormal ||
++          func == EV_ActionSecretExit      || func == EV_ActionSwitchSecretExit ||
++          func == EV_ActionParamExitSecret || func == EV_ActionTeleportNewMap  ||
++          func == EV_ActionTeleportEndGame;
++}
++
++bool B_ExitApproved()
++{
++   return !bot_exitvote || s_approved;
++}
++
++//
++// Percentual do mapa limpo, so para a pergunta dizer algo util. -1 quando o
++// mapa nao tem o que contar.
++//
++static int B_teamPercent(bool kills)
++{
++   const int total = kills ? totalkills : totalitems;
++   if(total <= 0)
++      return -1;
++
++   int done = 0;
 +   for(int i = 0; i < MAXPLAYERS; i++)
 +   {
-+      if(playeringame[i] && i != displayplayer && players[i].mo)
-+         order[count++] = i;
++      if(playeringame[i])
++         done += kills ? players[i].killcount : players[i].itemcount;
 +   }
 +
-+   if(!count)
++   return done * 100 / total;
++}
++
++//
++// Resposta "sim": libera a saida de vez neste mapa.
++//
++static void B_answerYes()
++{
++   s_asking   = false;
++   s_approved = true;
++   B_voteLog("jogador respondeu SIM: saida liberada");
++   doom_printf("Exit approved.");
++}
++
++void B_CastHumanVote(bool yes)
++{
++   if(!s_asking)
++   {
++      doom_printf("Nobody is asking to leave.");
++      return;
++   }
++
++   if(yes)
++   {
++      B_answerYes();
++      return;
++   }
++
++   s_asking       = false;
++   s_blockedUntil = gametic + bot_exitvote_delay * TICRATE;
++   B_voteLog("jogador respondeu NAO: mais %d segundos", bot_exitvote_delay);
++   doom_printf("Exit denied. %d more seconds down here.", bot_exitvote_delay);
++}
++
++bool B_RequestExitVote(int playernum)
++{
++   if(B_ExitApproved())
++      return true;
++
++   if(s_asking || gametic < s_blockedUntil)
++      return false;
++
++   s_asking      = true;
++   s_askDeadline = gametic + ANSWER_TIMEOUT_SECONDS * TICRATE;
++
++   const int kills = B_teamPercent(true);
++   const int items = B_teamPercent(false);
++
++   qstring question;
++   question << players[playernum].name << " wants to take the exit.";
++   if(kills >= 0)
++      question << "\n\nKills: " << kills << "%";
++   if(items >= 0)
++      question << (kills >= 0 ? "   Items: " : "\n\nItems: ") << items << "%";
++   question << "\n\nLet them go? (press y)";
++
++   B_voteLog("pergunta na tela: %s quer sair (mortes %d%%, itens %d%%)",
++             players[playernum].name, kills, items);
++   HU_Say(&players[playernum], "Found the exit. Can we go?");
++   MN_QuestionFunc(question.constPtr(), B_answerYes);
++   S_StartInterfaceSound(GameModeInfo->menuSounds[MN_SND_ACTIVATE]);
++
++   return false;
++}
++
++void B_VoteTicker()
++{
++   if(!bot_exitvote || !s_asking || gamestate != GS_LEVEL)
 +      return;
 +
-+   for(int a = 0; a < count - 1; a++)
++   // Silencio tambem e resposta: passado o prazo, vale como nao.
++   if(gametic >= s_askDeadline)
 +   {
-+      for(int b = a + 1; b < count; b++)
-+      {
-+         if(players[order[b]].killcount > players[order[a]].killcount)
-+         {
-+            const int swap = order[a];
-+            order[a] = order[b];
-+            order[b] = swap;
-+         }
-+      }
-+   }
-+
-+   // Escolha manual do F12 vale enquanto o prazo nao vence, e so no primeiro
-+   // quadrinho -- os outros seguem o ranking.
-+   if(gametic < pip_manual_until && pip_player >= 0 && pip_player < MAXPLAYERS &&
-+      playeringame[pip_player] && pip_player != displayplayer)
-+   {
-+      for(int i = 0; i < count; i++)
-+      {
-+         if(order[i] == pip_player)
-+         {
-+            const int swap = order[0];
-+            order[0] = order[i];
-+            order[i] = swap;
-+            break;
-+         }
-+      }
-+   }
-+   else if(gametic >= pip_manual_until)
-+      pip_player = order[0];   // volta sozinho para quem mais mata
-+
-+   int boxes = pip_count;
-+   if(boxes > count)
-+      boxes = count;
-+   if(boxes < 1)
-+      boxes = 1;
-+
-+   const int margin = video.width / 64;
-+   int w = video.width  * pip_size / 100;
-+   int h = video.height * pip_size / 100;
-+   w &= ~1;
-+   h &= ~1;
-+
-+   // Nao deixa a fila estourar a largura da tela.
-+   while(boxes > 1 && margin + boxes * (w + margin) > video.width)
-+      boxes--;
-+
-+   const int y = pip_bottom ? video.height - h - margin : margin;
-+
-+   for(int n = 0; n < boxes; n++)
-+   {
-+      const int x = margin + n * (w + margin);   // sempre da esquerda para a direita
-+
-+      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, w + 2, 1);
-+      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y + h,  w + 2, 1);
-+      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, 1, h + 2);
-+      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x + w,  y - 1, 1, h + 2);
-+
-+      R_RenderPipView(&players[order[n]], x, y, w, h);
++      s_asking       = false;
++      s_blockedUntil = gametic + bot_exitvote_delay * TICRATE;
++      B_voteLog("pergunta expirou sem resposta");
++      doom_printf("No answer. Asking again in %d seconds.", bot_exitvote_delay);
 +   }
 +}
 +
- //
- // D_Display
- //  draw current display, possibly wiping it from the previous
-@@ -617,6 +705,7 @@ static void D_Display()
-          {
-             R_DrawViewBorder();    // redraw border
-             R_RenderPlayerView(&players[displayplayer], camera);
-+            D_drawPipView();          // PIP: visao de outro jogador no canto
-          }
-          
-          ST_Drawer(scaledwindow.height == SCREENHEIGHT);  // killough 11/98
-@@ -1722,6 +1811,10 @@ static void D_DoomInit()
-    if((p = M_CheckParm("-bots")) && p < myargc - 1)
-       netbot = atoi(myargv[p + 1]);
- 
-+   // PIP: liga o quadrinho com a visao de outro jogador
-+   if(M_CheckParm("-pip"))
-+      pip_active = 1;
++// ----------------------------------------------------------------- console
 +
-    if((netgame || M_CheckParm("-solo-net") || netbot) &&
-       GameType == gt_single)
-    {
-diff --git a/source/g_cmd.cpp b/source/g_cmd.cpp
-index d1a56c4..a247293 100644
---- a/source/g_cmd.cpp
-+++ b/source/g_cmd.cpp
-@@ -42,6 +42,7 @@
- #include "e_player.h" // haleyjd: turbo cmd must alter playerclass info
- #include "f_wipe.h"
- #include "g_game.h"
-+#include "r_main.h"
- #include "hal/i_timer.h"
- #include "hu_stuff.h"
- #include "i_system.h"
-@@ -635,11 +636,30 @@ CONSOLE_COMMAND(spectate_prev, 0)
- 
- CONSOLE_COMMAND(spectate_next, 0)
- {
--   int i = displayplayer + 1;
--
-    if((gamestate != GS_LEVEL) || ((!demoplayback) && (GameType == gt_dm)))
-       return;
- 
-+   // Com o PIP ligado a tecla passa a girar quem aparece no quadrinho, e a
-+   // tela grande continua sendo a sua.
-+   if(pip_active)
++VARIABLE_BOOLEAN(bot_exitvote_log, nullptr, onoff);
++CONSOLE_VARIABLE(bot_exitvote_log, bot_exitvote_log, 0) {}
++
++VARIABLE_BOOLEAN(bot_exitvote, nullptr, onoff);
++CONSOLE_VARIABLE(bot_exitvote, bot_exitvote, 0) {}
++
++VARIABLE_INT(bot_exitvote_delay, nullptr, 5, 600, nullptr);
++CONSOLE_VARIABLE(bot_exitvote_delay, bot_exitvote_delay, 0) {}
++
++CONSOLE_COMMAND(vote_yes, 0)
++{
++   B_CastHumanVote(true);
++}
++
++CONSOLE_COMMAND(vote_no, 0)
++{
++   B_CastHumanVote(false);
++}
++
++// EOF
+diff --git a/source/autodoom/b_vote.h b/source/autodoom/b_vote.h
+new file mode 100644
+index 00000000..da111f83
+--- /dev/null
++++ b/source/autodoom/b_vote.h
+@@ -0,0 +1,61 @@
++// Emacs style mode select   -*- C++ -*-
++//-----------------------------------------------------------------------------
++//
++// Copyright (C) 2026 AutoDoom contributors
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++//--------------------------------------------------------------------------
++//
++// DESCRIPTION:
++//   Exit voting. No bot takes the exit on its own: it calls a vote, everyone
++//   answers according to how done they think the level is, and the exit only
++//   opens on a majority. A refused vote buys the level another minute.
++//
++//-----------------------------------------------------------------------------
++
++#ifndef B_VOTE_H__
++#define B_VOTE_H__
++
++// Liga o sistema. Com 0, os bots saem quando quiserem, como antes.
++extern int bot_exitvote;
++
++// Segundos de espera depois de uma votacao recusada.
++extern int bot_exitvote_delay;
++
++// 1 grava o que acontece em vote.log, ao lado do executavel. Desligado por
++// padrao: e ferramenta de diagnostico, nao deve sujar a pasta de quem so joga.
++extern int bot_exitvote_log;
++
++struct line_t;
++
++// A linha termina o mapa?
++bool B_LineIsExit(const line_t &line);
++
++// O exito ja foi autorizado nesta partida?
++bool B_ExitApproved();
++
++// Um bot quer sair. Pergunta ao jogador se ninguem estiver perguntando e o
++// tempo de espera tiver passado. Devolve true se a saida ja esta liberada.
++bool B_RequestExitVote(int playernum);
++
++// Chamado a cada tic pelo laco do jogo.
++void B_VoteTicker();
++
++// Zera tudo na entrada do mapa.
++void B_VoteMapInit();
++
++// Resposta pelos comandos de console, alternativa ao dialogo.
++void B_CastHumanVote(bool yes);
++
++#endif
++
++// EOF
+diff --git a/source/d_main.cpp b/source/d_main.cpp
+index 1a6e8939..d5697d87 100644
+--- a/source/d_main.cpp
++++ b/source/d_main.cpp
+@@ -79,6 +79,11 @@
+ #include "p_setup.h"
+ #include "r_draw.h"
+ #include "r_main.h"
++#include "r_state.h"
++#include "m_vector.h"
++#include "p_maputl.h"
++#include "ev_actions.h"
++#include "ev_specials.h"
+ #include "r_patch.h"
+ #include "s_sound.h"
+ #include "st_stuff.h"
+@@ -577,6 +582,66 @@ void D_DrawWings()
+ // Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
+ // principal e antes do HUD, que fica por cima de proposito.
+ //
++//
++// Posicao da saida do mapa, para o criterio "quem esta mais perto de sair".
++//
++// Calculada uma vez por mapa: percorre as linhas procurando os specials de
++// saida -- os mesmos que o bot reconhece em b_think -- e devolve o ponto medio
++// das que achou. Sem saida encontrada (mapa de fim de episodio, saida por
++// script), devolve false e o criterio cai de volta para o de abates.
++//
++static bool D_findExit(v2fixed_t &out)
++{
++   static int     cachedLevelTic = -1;
++   static bool    cachedFound;
++   static v2fixed_t cachedPos;
++
++   if(cachedLevelTic == levelstarttic)
 +   {
-+      int start = (pip_player < 0 || pip_player >= MAXPLAYERS) ? displayplayer : pip_player;
-+      for(int n = 1; n <= MAXPLAYERS; n++)
-+      {
-+         int i = (start + n) % MAXPLAYERS;
-+         if(playeringame[i] && i != displayplayer)
-+         {
-+            pip_player = i;
-+            // 10 segundos de escolha manual; depois volta para quem mais mata
-+            pip_manual_until = gametic + 10 * TICRATE;
-+            return;
-+         }
-+      }
-+      return;
++      out = cachedPos;
++      return cachedFound;
 +   }
 +
-+   int i = displayplayer + 1;
++   int64_t sumx = 0, sumy = 0;
++   int     count = 0;
 +
-    for(; i != displayplayer; i++)
++   for(int i = 0; i < numlines; i++)
++   {
++      const line_t &line = lines[i];
++      if(!line.special)
++         continue;
++
++      const ev_action_t *action = EV_ActionForSpecialOrGen(line.special);
++      if(!action)
++         continue;
++
++      const EVActionFunc func = action->action;
++      if(func != EV_ActionExitLevel        && func != EV_ActionSwitchExitLevel &&
++         func != EV_ActionGunExitLevel     && func != EV_ActionParamExitNormal &&
++         func != EV_ActionSecretExit       && func != EV_ActionSwitchSecretExit &&
++         func != EV_ActionParamExitSecret  && func != EV_ActionTeleportNewMap  &&
++         func != EV_ActionTeleportEndGame)
++      {
++         continue;
++      }
++
++      sumx += (line.v1->x + line.v2->x) / 2;
++      sumy += (line.v1->y + line.v2->y) / 2;
++      count++;
++   }
++
++   cachedLevelTic = levelstarttic;
++   cachedFound    = count > 0;
++   if(cachedFound)
++   {
++      cachedPos.x = static_cast<fixed_t>(sumx / count);
++      cachedPos.y = static_cast<fixed_t>(sumy / count);
++   }
++
++   out = cachedPos;
++   return cachedFound;
++}
++
+ static void D_drawPipView()
+ {
+    if(!pip_active || gamestate != GS_LEVEL || automapactive)
+@@ -596,11 +661,25 @@ static void D_drawPipView()
+    if(!count)
+       return;
+ 
++   v2fixed_t exitpos;
++   const bool byExit = pip_follow && D_findExit(exitpos);
++
++   auto rank = [&exitpos, byExit](int playernum) -> int64_t
++   {
++      if(!byExit)
++         return players[playernum].killcount;   // maior e melhor
++
++      // Distancia ate a saida: menor e melhor, entao entra negativa para a
++      // mesma ordenacao servir aos dois criterios.
++      const Mobj *mo = players[playernum].mo;
++      return -static_cast<int64_t>(P_AproxDistance(mo->x - exitpos.x, mo->y - exitpos.y));
++   };
++
+    for(int a = 0; a < count - 1; a++)
     {
-       if(i >= MAXPLAYERS)
+       for(int b = a + 1; b < count; b++)
+       {
+-         if(players[order[b]].killcount > players[order[a]].killcount)
++         if(rank(order[b]) > rank(order[a]))
+          {
+             const int swap = order[a];
+             order[a] = order[b];
+diff --git a/source/g_game.cpp b/source/g_game.cpp
+index 320fcbc7..63f8974b 100644
+--- a/source/g_game.cpp
++++ b/source/g_game.cpp
+@@ -38,6 +38,7 @@
+ #include "am_map.h"
+ #include "autodoom/b_ape.h"
+ #include "autodoom/b_think.h"
++#include "autodoom/b_vote.h"
+ #include "c_io.h"
+ #include "c_net.h"
+ #include "c_runcmd.h"
+@@ -2287,6 +2288,8 @@ void G_Ticker()
+    else
+    {
+       // get commands, check consistency, and build new consistancy check
++      B_VoteTicker();
++
+       int buf = (gametic / ticdup) % BACKUPTICS;
+       
+       for(i=0; i<MAXPLAYERS; i++)
 diff --git a/source/hu_frags.cpp b/source/hu_frags.cpp
-index 27eebb8..5e66f9e 100644
+index 27eebb8e..5e66f9e7 100644
 --- a/source/hu_frags.cpp
 +++ b/source/hu_frags.cpp
 @@ -82,10 +82,19 @@ void HU_FragsDrawer(void)
@@ -213,149 +529,91 @@ index 27eebb8..5e66f9e 100644
              temp = sortedplayers[i];
              sortedplayers[i] = sortedplayers[i+1];
 diff --git a/source/m_misc.cpp b/source/m_misc.cpp
-index 6213b63..220ef4d 100644
+index 220ef4de..9c331614 100644
 --- a/source/m_misc.cpp
 +++ b/source/m_misc.cpp
-@@ -463,6 +463,19 @@ default_t defaults[] =
-    DEFAULT_INT("comp_aircontrol", &default_comp[comp_aircontrol], &comp[comp_aircontrol],
-                1, 0, 1, default_t::wad_yes, "Disable jumping for DOOM/Heretic"),
+@@ -61,6 +61,7 @@
+ #include "p_user.h"
+ #include "r_draw.h"
+ #include "r_main.h"
++#include "autodoom/b_vote.h"
+ #include "r_sky.h"
+ #include "r_things.h"
+ #include "s_sound.h"
+@@ -476,6 +477,16 @@ default_t defaults[] =
+    DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
+                "How many PIP boxes to show, left to right"),
  
-+   // PIP: visao de outro jogador num quadrinho no canto
-+   DEFAULT_INT("pip", &pip_active, nullptr, 0, 0, 1, default_t::wad_no,
-+               "1 to show another player's view in a corner box"),
++   DEFAULT_INT("pip_follow", &pip_follow, nullptr, 0, 0, 1, default_t::wad_no,
++               "PIP target: 0=most kills, 1=closest to the exit"),
 +
-+   DEFAULT_INT("pip_size", &pip_size, nullptr, 25, 10, 50, default_t::wad_no,
-+               "PIP box size as a percentage of the screen"),
++   // Votacao de saida
++   DEFAULT_INT("bot_exitvote", &bot_exitvote, nullptr, 1, 0, 1, default_t::wad_no,
++               "1 to make bots vote before taking the exit"),
 +
-+   DEFAULT_INT("pip_bottom", &pip_bottom, nullptr, 0, 0, 1, default_t::wad_no,
-+               "PIP row: 0=top of the screen, 1=bottom"),
-+
-+   DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
-+               "How many PIP boxes to show, left to right"),
++   DEFAULT_INT("bot_exitvote_delay", &bot_exitvote_delay, nullptr, 60, 5, 600, default_t::wad_no,
++               "Seconds to wait after a refused exit vote"),
 +
     // For key bindings, the values stored in the key_* variables       // phares
     // are the internal Doom Codes. The values stored in the default.cfg
     // file are the keyboard codes. I_ScanCode2DoomCode converts from
+diff --git a/source/p_setup.cpp b/source/p_setup.cpp
+index b6027152..dbfcba44 100644
+--- a/source/p_setup.cpp
++++ b/source/p_setup.cpp
+@@ -32,6 +32,7 @@
+ #include "autodoom/b_analysis.h"
+ #include "autodoom/b_ape.h"
+ #include "autodoom/b_botmap.h"   // IOANCH
++#include "autodoom/b_vote.h"
+ #include "autodoom/b_lineeffect.h"
+ #include "autodoom/b_statistics.h"
+ #include "autodoom/b_think.h"
+@@ -3914,6 +3915,7 @@ void P_SetupLevel(WadDirectory *dir, const char *mapname, int playermask,
+    if(!demoplayback && !BotMap::demoPlayingFlag)
+    {
+       BotMap::Build();
++      B_VoteMapInit();   // votacao de saida comeca zerada a cada mapa
+       for (int i = 0; i < MAXPLAYERS; ++i)
+          if(playeringame[i])
+          {
 diff --git a/source/r_main.cpp b/source/r_main.cpp
-index 2ec797b..aaacdd0 100644
+index aaacdd0d..6747af79 100644
 --- a/source/r_main.cpp
 +++ b/source/r_main.cpp
-@@ -1217,6 +1217,73 @@ extern void R_UntaintPortals();
- //
- // Primary renderer entry point.
- //
-+//
-+// PIP -- picture-in-picture: a visao de outro jogador num quadrinho no canto.
-+//
-+// Funciona porque R_RenderPlayerView limpa todos os buffers dele na entrada
-+// (clip segs, draw segs, planos, portais, sprites), entao chamar duas vezes no
-+// mesmo quadro e seguro. O que precisa de cuidado e a geometria: viewwindow,
-+// os centros, o struct view e a tabela de altura por coluna. Tudo isso e
-+// salvo, trocado pelo retangulo do PIP e devolvido no fim.
-+//
-+int pip_active = 0;   // liga/desliga
-+int pip_size   = 25;  // porcentagem da tela, por quadrinho
-+int pip_bottom = 0;   // 0 = fila em cima, 1 = fila embaixo
-+int pip_count  = 1;   // quantos quadrinhos, da esquerda para a direita
-+int pip_player = -1;  // escolhido a mao pelo F12; -1 = automatico
-+int pip_manual_until = 0; // ate que gametic a escolha manual manda
-+
-+void R_RenderPipView(player_t *player, int x, int y, int w, int h)
-+{
-+   if(!player || !player->mo || w < 32 || h < 32)
-+      return;
-+
-+   const rrect_t   savedWindow  = viewwindow;
-+   const cb_view_t savedView    = view;
-+   const int       savedCenterX = centerx;
-+   const int       savedCenterY = centery;
-+   const fixed_t   savedCXFrac  = centerxfrac;
-+   const fixed_t   savedCYFrac  = centeryfrac;
-+
-+   viewwindow.x      = x;
-+   viewwindow.y      = y;
-+   viewwindow.width  = w;
-+   viewwindow.height = h;
-+
-+   centerx     = w / 2;
-+   centery     = h / 2;
-+   centerxfrac = centerx << FRACBITS;
-+   centeryfrac = centery << FRACBITS;
-+
-+   view.xcenter = (view.width  = (float)w) * 0.5f;
-+   view.ycenter = (view.height = (float)h) * 0.5f;
-+
-+   // A arma do outro jogador tem que encolher junto, senao vira um canhao
-+   // ocupando o quadrinho inteiro.
-+   const float shrinkX = (float)w / (float)savedWindow.width;
-+   const float shrinkY = (float)h / (float)savedWindow.height;
-+   view.pspritexscale *= shrinkX;
-+   view.pspriteyscale *= shrinkY;
-+   view.pspriteystep   = 1.0f / view.pspriteyscale;
-+
-+   R_InitTextureMapping();
-+   for(int i = 0; i < w; i++)
-+      screenheightarray[i] = view.height - 1.0f;
-+
-+   R_RenderPlayerView(player, nullptr);
-+
-+   viewwindow  = savedWindow;
-+   view        = savedView;
-+   centerx     = savedCenterX;
-+   centery     = savedCenterY;
-+   centerxfrac = savedCXFrac;
-+   centeryfrac = savedCYFrac;
-+
-+   R_InitTextureMapping();
-+   for(int i = 0; i < viewwindow.width; i++)
-+      screenheightarray[i] = view.height - 1.0f;
-+}
-+
- void R_RenderPlayerView(player_t* player, camera_t *camerapoint)
- {
-    bool quake = false;
-@@ -1481,6 +1548,12 @@ VARIABLE_TOGGLE(r_boomcolormaps, nullptr,           onoff);
- // SoM: Variable FOV
- VARIABLE_INT(fov, nullptr, 20, 179, nullptr);
+@@ -1230,6 +1230,7 @@ int pip_active = 0;   // liga/desliga
+ int pip_size   = 25;  // porcentagem da tela, por quadrinho
+ int pip_bottom = 0;   // 0 = fila em cima, 1 = fila embaixo
+ int pip_count  = 1;   // quantos quadrinhos, da esquerda para a direita
++int pip_follow = 0;   // 0 = quem mais mata, 1 = quem esta mais perto da saida
+ int pip_player = -1;  // escolhido a mao pelo F12; -1 = automatico
+ int pip_manual_until = 0; // ate que gametic a escolha manual manda
  
-+// PIP
-+VARIABLE_INT(pip_active, nullptr, 0,  1,  nullptr);
-+VARIABLE_INT(pip_size,   nullptr, 10, 50, nullptr);
-+VARIABLE_INT(pip_bottom, nullptr, 0,  1,  nullptr);
-+VARIABLE_INT(pip_count,  nullptr, 1,  3,  nullptr);
-+
+@@ -1553,6 +1554,7 @@ VARIABLE_INT(pip_active, nullptr, 0,  1,  nullptr);
+ VARIABLE_INT(pip_size,   nullptr, 10, 50, nullptr);
+ VARIABLE_INT(pip_bottom, nullptr, 0,  1,  nullptr);
+ VARIABLE_INT(pip_count,  nullptr, 1,  3,  nullptr);
++VARIABLE_INT(pip_follow, nullptr, 0,  1,  nullptr);
+ 
  // SoM: Portal tainted
  VARIABLE_BOOLEAN(showtainted, nullptr,              onoff);
+@@ -1576,6 +1578,7 @@ CONSOLE_VARIABLE(pip, pip_active, 0) {}
+ CONSOLE_VARIABLE(pip_size, pip_size, 0) {}
+ CONSOLE_VARIABLE(pip_bottom, pip_bottom, 0) {}
+ CONSOLE_VARIABLE(pip_count, pip_count, 0) {}
++CONSOLE_VARIABLE(pip_follow, pip_follow, 0) {}
  
-@@ -1499,6 +1572,11 @@ CONSOLE_VARIABLE(r_fov, fov, 0)
- 
- CONSOLE_VARIABLE(r_showrefused, showtainted, 0) {}
- 
-+CONSOLE_VARIABLE(pip, pip_active, 0) {}
-+CONSOLE_VARIABLE(pip_size, pip_size, 0) {}
-+CONSOLE_VARIABLE(pip_bottom, pip_bottom, 0) {}
-+CONSOLE_VARIABLE(pip_count, pip_count, 0) {}
-+
  CONSOLE_VARIABLE(gamma, usegamma, 0)
  {
-    const char *msg;
 diff --git a/source/r_main.h b/source/r_main.h
-index 46fa338..905b493 100644
+index 905b4934..f6805d08 100644
 --- a/source/r_main.h
 +++ b/source/r_main.h
-@@ -119,6 +119,15 @@ struct player_t;
+@@ -125,6 +125,7 @@ extern int pip_active;
+ extern int pip_size;
+ extern int pip_bottom;
+ extern int pip_count;
++extern int pip_follow;
+ extern int pip_player;
+ extern int pip_manual_until;
  
- void R_RenderPlayerView(player_t *player, camera_t *viewcamera);
- 
-+// PIP: segunda visao, num retangulo qualquer da tela
-+void R_RenderPipView(player_t *player, int x, int y, int w, int h);
-+extern int pip_active;
-+extern int pip_size;
-+extern int pip_bottom;
-+extern int pip_count;
-+extern int pip_player;
-+extern int pip_manual_until;
-+
- //
- // R_ResetFOV
- // 

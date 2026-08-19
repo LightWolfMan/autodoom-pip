@@ -77,6 +77,26 @@ internal static class GameConfig
       }
    }
 
+   // ------------------------------------------------------- camera do PIP
+
+   /// <summary>0 = segue quem mais mata, 1 = segue quem esta mais perto da saida.</summary>
+   public static int PipFollow(string gameDir)
+   {
+      foreach (string profile in Profiles(gameDir))
+      {
+         string? value = ReadValue(Path.Combine(profile, "eternity.cfg"), "pip_follow");
+         if (value is not null && int.TryParse(value, out int parsed))
+            return parsed;
+      }
+      return 0;
+   }
+
+   public static void SetPipFollow(string gameDir, int mode)
+   {
+      foreach (string profile in Profiles(gameDir))
+         WriteValue(Path.Combine(profile, "eternity.cfg"), "pip_follow", mode.ToString());
+   }
+
    // -------------------------------------------------------------- baixo nivel
 
    private static string? ReadValue(string cfg, string key)

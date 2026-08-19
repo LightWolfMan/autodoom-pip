@@ -44,9 +44,13 @@ loose ends of running AutoDoom together.
   the box for ten seconds, then it goes back on its own.
 - **Launcher** — IWAD and PWAD pickers, Copilot and Co-op modes, bot count, and a WAD finder
   that reads the NTFS journal instead of walking the disk.
+- **Nobody leaves without asking** — a bot that reaches the exit switch stops there and asks
+  you, with the engine's own yes/no prompt. Say no and the level gets another minute before
+  anyone asks again.
 - **Co-op scoreboard** — hold `F` for a ranking by kills. Eternity's scoreboard was deathmatch
   only; a small patch opens it up.
-- **Bilingual** — the launcher follows your Windows language (English or Portuguese).
+- **Bilingual** — the launcher always follows your Windows language, English or Portuguese, with
+  nothing to configure.
 - **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
 
 <img src="docs/launcher-en.png" alt="The AutoDoom Launcher window" width="520">
@@ -91,6 +95,7 @@ In game:
 | Key | Action |
 | --- | --- |
 | `F` (hold) | Kill scoreboard |
+| `Y` | Answer yes when a bot asks to take the exit |
 | `F12` | Move the PIP box to the next player, for ten seconds |
 | `Space` | Jump, when enabled in the launcher |
 
@@ -107,6 +112,18 @@ command line, or with the console variables below — all of them are saved in `
 | `pip_size` | Size of each box, as a percentage of the screen | `25` | `10`–`50` |
 | `pip_count` | How many boxes, laid out left to right | `1` | `1`–`3` |
 | `pip_bottom` | `0` = top row, `1` = bottom row | `0` | `0`–`1` |
+| `pip_follow` | `0` = whoever kills the most, `1` = whoever is closest to the exit | `0` | `0`–`1` |
+
+Exit approval has its own switches:
+
+| cvar | What it does | Default |
+| --- | --- | --- |
+| `bot_exitvote` | Bots must ask before taking the exit | `1` |
+| `bot_exitvote_delay` | Seconds to wait after a refusal | `60` |
+| `bot_exitvote_log` | Write what happened to `vote.log` | `0` |
+
+`vote_yes` and `vote_no` answer from the console, if you would rather bind keys than use the
+prompt.
 
 The launcher also flips two engine settings that have nothing to do with PIP:
 
@@ -212,9 +229,13 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   quadrinho por dez segundos e depois ele volta sozinho.
 - **Launcher** — escolha de IWAD e PWAD, modos Copiloto e Coop, número de bots, e um detector de
   WADs que lê o journal do NTFS em vez de varrer o disco.
+- **Ninguém sai sem perguntar** — o bot que chega no botão da saída para ali e pergunta, com o
+  mesmo diálogo de sim/não que a engine usa para sair do jogo. Diga não e o mapa ganha mais um
+  minuto antes de alguém perguntar de novo.
 - **Placar no coop** — segure `F` para o ranking por abates. O placar do Eternity só valia em
   deathmatch; um patch pequeno abriu.
-- **Bilíngue** — o launcher acompanha o idioma do Windows (português ou inglês).
+- **Bilíngue** — o launcher sempre acompanha o idioma do Windows, português ou inglês, sem nada
+  para configurar.
 - **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
 
 <img src="docs/launcher-pt.png" alt="A janela do AutoDoom Launcher" width="520">
@@ -257,6 +278,7 @@ No jogo:
 | Tecla | Ação |
 | --- | --- |
 | `F` (segurando) | Placar de abates |
+| `Y` | Responde sim quando um bot pede para sair |
 | `F12` | Passa o quadrinho para o próximo jogador, por dez segundos |
 | `Espaço` | Pular, quando ligado no launcher |
 
@@ -268,6 +290,17 @@ No jogo:
 | `pip_size` | Tamanho de cada quadrinho, em % da tela | `25` | `10`–`50` |
 | `pip_count` | Quantos quadrinhos, da esquerda para a direita | `1` | `1`–`3` |
 | `pip_bottom` | `0` = fila em cima, `1` = embaixo | `0` | `0`–`1` |
+| `pip_follow` | `0` = quem mais mata, `1` = quem está mais perto da saída | `0` | `0`–`1` |
+
+A autorização de saída tem as suas:
+
+| cvar | O que faz | Padrão |
+| --- | --- | --- |
+| `bot_exitvote` | O bot precisa pedir antes de acionar a saída | `1` |
+| `bot_exitvote_delay` | Segundos de espera depois de um "não" | `60` |
+| `bot_exitvote_log` | Grava o que aconteceu em `vote.log` | `0` |
+
+`vote_yes` e `vote_no` respondem pelo console, se você preferir teclas ao diálogo.
 
 O launcher também mexe em duas opções da engine que nada têm a ver com o PIP:
 

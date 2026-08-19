@@ -58,9 +58,6 @@ internal sealed class LauncherSettings
    /// </summary>
    public bool WeaponsDisappear { get; set; }
 
-   /// <summary>Idioma da interface: "auto" (o do Windows), "pt" ou "en".</summary>
-   public string Language { get; set; } = "auto";
-
    [JsonIgnore]
    public string? FilePath { get; private set; }
 

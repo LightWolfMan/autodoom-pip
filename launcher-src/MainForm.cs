@@ -31,6 +31,8 @@ internal sealed class MainForm : Form
    private readonly CheckBox    _cbWeapons = new();
    private readonly CheckBox    _cbJump    = new();
    private readonly CheckBox    _cbScores  = new();
+   private readonly ComboBox    _cbFollow  = new();
+   private readonly Label       _lblFollow = new();
    private readonly GroupBox    _grpProgress = new();
    private readonly TableLayoutPanel _progressRows = new();
    private readonly Dictionary<string, (ProgressBar Bar, Label Info)> _volumeRows = new(StringComparer.OrdinalIgnoreCase);
@@ -241,9 +243,6 @@ internal sealed class MainForm : Form
       _autoDetect = autoDetect;
       _gameDir    = FindGameDir();
       _settings   = LauncherSettings.Load(_gameDir);
-
-      // Idioma antes de qualquer texto: o construtor da UI ja le os Strings.
-      Strings.Use(_settings.Language);
 
       BuildUi();
       LoadState();
@@ -571,6 +570,7 @@ internal sealed class MainForm : Form
          Padding       = new Padding(12, 8, 12, 12),
       };
       layout.Controls.Add(_cbPip);
+      layout.Controls.Add(BuildFollowRow());
       layout.Controls.Add(_cbWeapons);
       layout.Controls.Add(hint);
       layout.Controls.Add(_cbJump);
@@ -581,6 +581,38 @@ internal sealed class MainForm : Form
       box.Controls.Add(layout);
       FitGroupToContent(box, layout);
       return box;
+   }
+
+   /// <summary>Quem o quadrinho persegue. So faz sentido com o PIP ligado.</summary>
+   private Control BuildFollowRow()
+   {
+      _lblFollow.Text      = Strings.FollowLabel;
+      _lblFollow.AutoSize  = true;
+      _lblFollow.Anchor    = AnchorStyles.Left;
+      _lblFollow.ForeColor = SystemColors.ControlText;
+      _lblFollow.Margin    = new Padding(20, 0, Gutter, 0);
+
+      _cbFollow.DropDownStyle = ComboBoxStyle.DropDownList;
+      _cbFollow.Anchor        = AnchorStyles.Left;
+      _cbFollow.Width         = LogicalToDeviceUnits(230);
+      _cbFollow.Margin        = new Padding(0);
+      _cbFollow.Items.Add(Strings.FollowKills);
+      _cbFollow.Items.Add(Strings.FollowExit);
+
+      var row = new TableLayoutPanel
+      {
+         ColumnCount  = 2,
+         RowCount     = 1,
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Margin       = new Padding(0, 0, 0, Gutter),
+      };
+      row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      row.Controls.Add(_lblFollow, 0, 0);
+      row.Controls.Add(_cbFollow,  1, 0);
+      return row;
    }
 
    private static GroupBox MakeGroup(string text) => new()
@@ -985,12 +1017,14 @@ internal sealed class MainForm : Form
       _tbBots.Value      = Math.Clamp(_settings.BotCount, 1, MaxBots);
       _cbWeapons.Checked = _settings.WeaponsDisappear;
       _cbJump.Checked    = GameConfig.JumpEnabled(_gameDir);
+      _cbFollow.SelectedIndex = Math.Clamp(GameConfig.PipFollow(_gameDir), 0, 1);
       _cbScores.Checked  = GameConfig.ScoreboardEnabled(_gameDir);
 
       // So oferece o PIP se o executavel com o patch estiver do lado.
       bool hasPip = File.Exists(Path.Combine(_gameDir, PipExeName));
       _cbPip.Enabled = hasPip;
       _cbPip.Checked = hasPip && _settings.Pip;
+      _cbPip.CheckedChanged += (_, _) => UpdateEnabledState();
       if (!hasPip)
          _tips.SetToolTip(_cbPip, Strings.PipMissing);
 
@@ -1086,6 +1120,8 @@ internal sealed class MainForm : Form
    {
       _btnPlay.Enabled = _lbIwads.SelectedItem is IwadEntry && !_scanning;
       _tbBots.Enabled      = _rbCoop.Checked;
+      _cbFollow.Enabled    = _cbPip.Enabled && _cbPip.Checked;
+      _lblFollow.Enabled   = _cbFollow.Enabled;
       _lblBotCount.Enabled = _rbCoop.Checked;
       UpdateBotHint();
    }
@@ -1496,6 +1532,7 @@ internal sealed class MainForm : Form
       // Pulo e placar moram na config da engine: escrever agora, com o jogo
       // fechado, e o unico momento em que a mudanca sobrevive.
       GameConfig.SetJump(_gameDir, _cbJump.Checked);
+      GameConfig.SetPipFollow(_gameDir, Math.Max(_cbFollow.SelectedIndex, 0));
       GameConfig.SetScoreboard(_gameDir, _cbScores.Checked);
 
       // O que o AutoDoom ToH.cmd fazia antes de subir o jogo.

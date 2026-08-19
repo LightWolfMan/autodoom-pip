@@ -11,21 +11,16 @@ namespace AutoDoomLauncher;
 /// </summary>
 internal static class Strings
 {
-   private static bool _portuguese = DetectPortuguese(null);
-
-   /// <summary>Idiomas que o launcher oferece.</summary>
-   public static readonly string[] Available = ["auto", "pt", "en"];
+   /// <summary>
+   /// O idioma vem sempre do Windows, sem opcao de forcar: uma configuracao a menos
+   /// para o usuario errar, e o launcher fala a lingua da maquina onde abriu.
+   /// </summary>
+   private static readonly bool _portuguese = DetectPortuguese();
 
    public static bool IsPortuguese => _portuguese;
 
-   /// <summary>Define o idioma. Vazio, nulo ou "auto" volta para o do sistema.</summary>
-   public static void Use(string? language) => _portuguese = DetectPortuguese(language);
-
-   private static bool DetectPortuguese(string? language)
+   private static bool DetectPortuguese()
    {
-      if (!string.IsNullOrWhiteSpace(language) && !language.Equals("auto", StringComparison.OrdinalIgnoreCase))
-         return language.StartsWith("pt", StringComparison.OrdinalIgnoreCase);
-
       try
       {
          return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
@@ -63,6 +58,14 @@ internal static class Strings
    public static string WeaponsHint => Pick(
       "No Coop o padrao do Doom e a arma ficar no chao para todo mundo pegar.",
       "In Coop, Doom's default leaves weapons on the floor for everyone.");
+
+   public static string FollowLabel => Pick("A camera segue:", "The camera follows:");
+
+   public static string FollowKills => Pick("quem mais mata", "whoever kills the most");
+
+   public static string FollowExit => Pick(
+      "quem esta mais perto da saida",
+      "whoever is closest to the exit");
 
    public static string JumpOption => Pick(
       "Liberar o &pulo (a engine vem com ele desativado)",
