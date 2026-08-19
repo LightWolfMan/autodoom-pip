@@ -2,19 +2,19 @@
 
 Este repositorio junta duas obras com origens diferentes.
 
-## autodoom_pip.exe e autodoom-pip.patch
+## A engine com o patch e o autodoom-pip.patch
 
 Trabalho derivado do **Eternity Engine** e do **AutoDoom**, distribuidos sob a
 **GNU General Public License v3** (veja `COPYING-GPLv3`). O fonte modificado esta
 publicado em https://github.com/LightWolfMan/AutoDoom, branch `pip-view`, e o
 mesmo patch acompanha este repositorio.
 
-## AutoDoom Launcher e Install-AutoDoomPip.ps1
+## AutoDoom Launcher
 
-Obra propria, escrita do zero em C# e PowerShell. Nao deriva do Eternity nem do
-AutoDoom, e nao esta coberta pela GPL acima. Distribuida sob a **licenca MIT**.
+Obra propria, escrita do zero. Nao deriva do Eternity nem do AutoDoom, e nao
+esta coberta pela GPL acima. Distribuida sob a **licenca MIT**.
 
-## Icones da janela (launcher-src/Icons)
+## Icones da janela (linux-launcher/icons)
 
 Sao os **Fluent UI System Icons** da Microsoft, tambem sob **licenca MIT**,
 rasterizados a partir dos SVG originais de

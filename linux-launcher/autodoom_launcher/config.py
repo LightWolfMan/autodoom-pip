@@ -1,12 +1,12 @@
 """Configuracao: a da engine (que e dela) e a do launcher (que e nossa).
 
-A engine guarda perfil por jogo em `<game_dir>/user/<jogo>/`, do mesmo jeito no
-Linux e no Windows -- so muda a raiz. O launcher guarda o que e dele no lugar
-que o Linux espera: `$XDG_CONFIG_HOME/autodoom-launcher/settings.json`.
+A engine guarda um perfil por jogo em `<game_dir>/user/<jogo>/`. O launcher nao
+mistura o que e dele com o que e da engine: as preferencias da janela vao para
+`$XDG_CONFIG_HOME/autodoom-launcher/settings.json`, como manda a XDG.
 
-Regra herdada do launcher Windows, e ela vale mais ainda aqui: escrever na
-config da engine **antes** de subir o jogo. A engine le no inicio e reescreve o
-arquivo ao sair, entao mexer com o jogo aberto e trabalho perdido.
+Uma regra vale para tudo que se escreve na config da engine: escrever **antes**
+de subir o jogo. Ela le no inicio e reescreve o arquivo ao sair, entao mexer com
+o jogo aberto e trabalho perdido.
 """
 
 from __future__ import annotations
@@ -80,9 +80,9 @@ def ensure_project_keys(game_dir: str, repo_root: str | None = None) -> list[str
     """
     Escreve o teclado do projeto em perfil que ainda nao tem `keys.csc`.
 
-    Nunca sobrescreve: perfil existente tem as teclas do dono. No Linux isso
-    importa mais que no Windows, porque a engine comeca de um perfil zerado e
-    sobe com o teclado de 1993 -- setas para andar, sem WASD.
+    Nunca sobrescreve: perfil existente tem as teclas do dono. Instalacao nova
+    precisa disso, porque a engine comeca de um perfil zerado e sobe com o
+    teclado de 1993 -- setas para andar, sem WASD.
     """
     source = keys_source(repo_root)
     if source is None:

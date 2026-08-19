@@ -1,8 +1,7 @@
 # AutoDoom Launcher para Linux — esqueleto
 
 Python 3 + GTK 4 + libadwaita (PyGObject). Já abre, monta a linha de comando certa e sobe o
-jogo; ainda não tem seletor de PWAD, ficha do IWAD com o logo lido de dentro do arquivo, nem
-a varredura com barra de progresso que a versão Windows tem.
+jogo; ainda não tem seletor de PWAD nem a varredura com barra de progresso.
 
 ![O esqueleto rodando no Ubuntu 24.04](../docs/linux-launcher.png)
 
@@ -59,7 +58,7 @@ Sem argumento ele procura, nessa ordem: o diretório atual, `~/AutoDoom` e
 
 ## O que falta
 
-- Seletor de PWAD, com a mesma validação de compatibilidade da versão Windows.
+- Seletor de PWAD, com validação de compatibilidade (mapa que não bate com o IWAD escolhido).
 - Ficha do IWAD: logo extraído do próprio arquivo (`M_DOOM`/`TITLEPIC`), nome, tamanho, mapas.
 - Bilíngue — hoje os textos estão fixos em português, direto no `window.py`.
 - Empacotamento: `.deb` e `PKGBUILD`.

@@ -14,7 +14,7 @@
 
 <img src="docs/linux-pip.png" alt="AutoDoom running on Linux, with the picture-in-picture box in the top-left corner showing another bot's view" width="820">
 
-<sub>Built and captured on Ubuntu 24.04. This branch carries the Linux side of the project; the screenshots on <code>main</code> are the Windows ones.</sub>
+<sub>Built and captured on Ubuntu 24.04.</sub>
 
 </div>
 
@@ -59,9 +59,9 @@ loose ends of running AutoDoom together.
   only; a small patch opens it up.
 - **Game logos in the list** — each IWAD shows its own logo, read straight out of that WAD
   (`M_DOOM`), and they are listed in release order.
-- **Bilingual** — the launcher always follows your Windows language, English or Portuguese, with
-  nothing to configure.
-- **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
+- **Bilingual** — the launcher follows your system language, English or Portuguese, with nothing
+  to configure.
+- **Non-destructive** — the patched binary sits *beside* a stock AutoDoom build, never on top of it.
 
 <img src="docs/linux-launcher.png" alt="The GTK4 launcher skeleton running on Ubuntu 24.04" width="520">
 
@@ -72,8 +72,8 @@ are still missing.</sub>
 ### The keyboard layout
 
 Eternity boots the 1993 keyboard — arrows to walk, no WASD — and on Linux you get it fresh,
-because **none of your Windows bindings come along**: the engine starts from an empty profile
-and says `keys.csc not found, using defaults`.
+because a fresh install has **no bindings at all**: the engine starts from an empty profile and
+says `keys.csc not found, using defaults`.
 
 The project's layout is in [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc): `WASD` to
 move, `E` to use, `Ctrl` and `mouse1` to fire, `mouse2` for the alternate attack, `Space` to
@@ -148,7 +148,7 @@ In game:
 | `F12` | Move the PIP box to the next player, for ten seconds |
 | `Space` | Jump, when enabled in the launcher |
 
-<sub>(The scoreboard screenshot lives on <code>main</code>: it was taken on Windows, and this branch keeps only pictures made on Linux.)</sub>
+<sub>(No screenshot of the scoreboard yet — it needs a key held down while the shot is taken.)</sub>
 
 ## Configuration
 
@@ -184,28 +184,9 @@ The launcher also flips two engine settings that have nothing to do with PIP:
 
 ## Building from source
 
-```
-msbuild vc2019\Eternity.sln /p:Configuration=Release /p:Platform=Win32 ^
-  /p:PlatformToolset=v143 /p:SDL2_0=<sdl2> /p:SDLMIXER2_0=<mixer> /p:SDLNET2_0=<net>
-```
-
-Two things that cost an afternoon:
-
-- The **`adlmidi` submodule must be populated** (`git submodule update --init`), otherwise the
-  build fails on missing source files.
-- **Build Win32.** If the binary is going to sit next to the 32-bit DLLs that ship with
-  AutoDoom, an x64 build dies with `0xc000007b`.
-
-The launcher builds with `dotnet publish -c Release -r win-x64 --self-contained false
--p:PublishSingleFile=true`; its source is in [`launcher-src/`](launcher-src).
-
-### On Linux
-
-The engine needs no porting — Eternity ships a full `CMakeLists.txt`, and this patch touches
-no Windows API: it uses `fopen`, `fprintf` and the engine's own `psnprintf`. `b_vote.cpp`
-joins the build by itself, because `source/CMakeLists.txt` collects sources with
-`FILE (GLOB autodoom/*.cpp)` — only the MSVC `.vcxproj` needed a hand-written line, and
-Linux never reads it.
+Eternity ships a full `CMakeLists.txt`, and the patch is plain C++ on the standard library —
+`fopen`, `fprintf` and the engine's own `psnprintf`. `b_vote.cpp` joins the build by itself,
+because `source/CMakeLists.txt` collects sources with `FILE (GLOB autodoom/*.cpp)`.
 
 ```
 sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev
@@ -219,18 +200,16 @@ ln -s ../../base source/base       # the engine wants base/ next to the binary
 [`tools/build_linux.sh`](tools/build_linux.sh) does all of that. Verified on Ubuntu 24.04
 (CMake 3.28.3, GCC 13.3, SDL2 2.30): the patch applied clean, the build finished with **zero
 errors**, and the running game showed the PIP box and the exit vote. The copilot was measured
-the same way as on Windows — 76.4% of pixels changing over five seconds with `-copilot 1`
-against 0.0% with `-copilot 0`.
+by frame difference, since the bot needs no input to prove itself — 76.4% of pixels changing
+over five seconds with `-copilot 1` against 0.0% with `-copilot 0`.
 
 One thing to watch: `cmake_minimum_required (VERSION 2.6)` is only a warning under CMake 3.x
 but an **error under CMake 4**, which newer distributions ship.
 
-**Your Windows settings do not come along.** The Linux build starts from a fresh profile in
-its own `user/` directory, so the engine boots with `keys.csc not found, using defaults` and
-none of the launcher's bindings exist there — no `F` for the scoreboard, no `Backspace` for
-`bot_unstick`. Bind them by hand for now; wiring that up is part of step 2.
-
-The WinForms launcher from `main` does not run here; its GTK4 replacement lives in `linux-launcher/`.
+**A fresh build starts with an empty profile.** The engine boots with `keys.csc not found,
+using defaults`, so none of the project's bindings exist yet — no `F` for the scoreboard, no
+`Backspace` for `bot_unstick`. Copy `keys/autodoom-modern.csc` over
+`<game>/user/<game>/keys.csc`, or let the launcher do it.
 
 ## How it works
 
@@ -252,7 +231,7 @@ a player instead.
 - The launcher is a skeleton: no PWAD picker, no IWAD details panel, no progress bar yet.
 - Finding WADs depends on `plocate`'s database. A WAD created after the last `updatedb` run is
   invisible until the next one — run `sudo updatedb` if something is missing. There is no
-  equivalent to the NTFS journal here: ext4 keeps no queryable diary of file names.
+  the filesystem keeps no queryable diary of file names, so an index is the only fast answer.
 - `pip_count` above `1` is implemented but has had little real use.
 - No crouching: there is no crouch code anywhere in Eternity, only an unused ACS constant.
 
@@ -268,7 +247,7 @@ This repository carries two works with different origins.
 
 | Part | Licence | Why |
 | --- | --- | --- |
-| `autodoom_pip.exe`, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derived from the Eternity Engine and AutoDoom. The modified source is published [here](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
+| The patched engine, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derived from the Eternity Engine and AutoDoom. The modified source is published [here](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
 | Launcher, installer script | [MIT](LICENSE-launcher.md) | Written from scratch; does not derive from Eternity. |
 
 ## Credits
@@ -326,9 +305,9 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   deathmatch; um patch pequeno abriu.
 - **Logos dos jogos na lista** — cada IWAD mostra o próprio logo, lido de dentro daquele WAD
   (`M_DOOM`), e a lista vem em ordem de lançamento.
-- **Bilíngue** — o launcher sempre acompanha o idioma do Windows, português ou inglês, sem nada
+- **Bilíngue** — o launcher acompanha o idioma do sistema, português ou inglês, sem nada
   para configurar.
-- **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
+- **Não destrutivo** — o binário com o patch fica *ao lado* de um AutoDoom comum, nunca por cima.
 
 <img src="docs/linux-launcher.png" alt="O esqueleto do launcher GTK4 rodando no Ubuntu 24.04" width="520">
 
@@ -339,8 +318,8 @@ IWAD.</sub>
 ### O teclado
 
 A engine sobe com o teclado de 1993 — setas para andar, sem WASD — e no Linux você pega ele
-zerado, porque **nenhum bind do Windows vem junto**: o perfil começa vazio e a engine avisa
-`keys.csc not found, using defaults`.
+zerado, porque uma instalação nova **não tem bind nenhum**: o perfil começa vazio e a engine
+avisa `keys.csc not found, using defaults`.
 
 O teclado do projeto está em [`keys/autodoom-modern.csc`](keys/autodoom-modern.csc): `WASD`
 para andar, `E` para usar, `Ctrl` e `mouse1` para atirar, `mouse2` para o tiro alternativo,
@@ -442,38 +421,24 @@ O launcher também mexe em duas opções da engine que nada têm a ver com o PIP
 
 ## Compilando
 
-```
-msbuild vc2019\Eternity.sln /p:Configuration=Release /p:Platform=Win32 ^
-  /p:PlatformToolset=v143 /p:SDL2_0=<sdl2> /p:SDLMIXER2_0=<mixer> /p:SDLNET2_0=<net>
-```
-
-Duas pedras que custaram uma tarde: o submódulo **`adlmidi` precisa estar populado**
-(`git submodule update --init`), e **compile em Win32** — um build x64 ao lado das DLLs de 32
-bits do AutoDoom morre com `0xc000007b`.
-
-### No Linux
-
-A engine não precisa de porte — o Eternity traz um `CMakeLists.txt` completo, e este patch não
-usa **nenhuma** API do Windows: só `fopen`, `fprintf` e o `psnprintf` da própria engine. O
-`b_vote.cpp` entra no build sozinho, porque o `source/CMakeLists.txt` monta a lista com
-`FILE (GLOB autodoom/*.cpp)` — o único lugar que precisou de linha manual foi o `.vcxproj` do
-MSVC, que no Linux ninguém lê.
+O Eternity traz um `CMakeLists.txt` completo, e o patch é C++ comum, sobre a biblioteca
+padrão: `fopen`, `fprintf` e o `psnprintf` da própria engine. O `b_vote.cpp` entra no build
+sozinho, porque o `source/CMakeLists.txt` monta a lista com `FILE (GLOB autodoom/*.cpp)`.
 
 O [`tools/build_linux.sh`](tools/build_linux.sh) faz o caminho inteiro: dependências,
 submódulo, patch e build. Verificado numa Ubuntu 24.04 (CMake 3.28.3, GCC 13.3, SDL2 2.30) —
 o patch aplicou limpo, o build terminou com **zero erros** e o jogo rodando mostrou o
-quadrinho do PIP e a votação de saída na tela. O copiloto foi medido como no Windows: **76,4%**
-dos pixels mudando em cinco segundos com `-copilot 1`, contra **0,0%** com `-copilot 0`.
+quadrinho do PIP e a votação de saída na tela. O copiloto foi medido por diferença de quadros,
+já que o bot não precisa de input para se provar: **76,4%** dos pixels mudando em cinco
+segundos com `-copilot 1`, contra **0,0%** com `-copilot 0`.
 
 Um cuidado: o `cmake_minimum_required (VERSION 2.6)` é só um aviso no CMake 3.x, mas vira
 **erro no CMake 4**, que as distribuições novas já trazem.
 
-**A sua configuração do Windows não vai junto.** O build Linux começa de um perfil zerado, no
-`user/` dele, então a engine sobe com `keys.csc not found, using defaults` e nenhum dos binds
-que o launcher escreve existe lá — nem o `F` do placar, nem o `Backspace` do `bot_unstick`.
-Por enquanto é amarrar na mão; automatizar isso faz parte da etapa 2.
-
-O launcher WinForms da `main` não roda aqui; o substituto em GTK4 está em `linux-launcher/`.
+**Uma instalação nova começa com o perfil vazio.** A engine sobe com `keys.csc not found,
+using defaults`, então nenhum bind do projeto existe ainda — nem o `F` do placar, nem o
+`Backspace` do `bot_unstick`. Copie o `keys/autodoom-modern.csc` por cima do
+`<jogo>/user/<jogo>/keys.csc`, ou deixe o launcher fazer isso.
 
 ## Como funciona
 
@@ -491,8 +456,8 @@ pensamento do bot.
 
 - O launcher é um esqueleto: ainda sem seletor de PWAD, sem ficha do IWAD e sem barra de progresso.
 - A busca de WADs depende do banco do `plocate`. Um WAD criado depois do último `updatedb` fica
-  invisível até o próximo — rode `sudo updatedb` se faltar algo. Não há equivalente ao journal
-  do NTFS aqui: o ext4 não guarda um diário de nomes consultável.
+  invisível até o próximo — rode `sudo updatedb` se faltar algo. O sistema de arquivos não
+  guarda um diário de nomes consultável, então um índice é a única resposta rápida.
 - `pip_count` maior que `1` está implementado, mas foi pouco usado de verdade.
 - Não há agachamento: não existe código de crouch no Eternity, apenas uma constante de ACS sem uso.
 
@@ -500,5 +465,5 @@ pensamento do bot.
 
 | Parte | Licença | Por quê |
 | --- | --- | --- |
-| `autodoom_pip.exe`, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derivado do Eternity Engine e do AutoDoom. O fonte modificado está publicado [aqui](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
+| A engine com o patch, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derivado do Eternity Engine e do AutoDoom. O fonte modificado está publicado [aqui](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
 | Launcher, script de instalação | [MIT](LICENSE-launcher.md) | Escrito do zero; não deriva do Eternity. |

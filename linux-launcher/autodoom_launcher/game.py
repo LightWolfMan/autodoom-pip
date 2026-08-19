@@ -1,9 +1,9 @@
 """Montar a linha de comando e subir o jogo.
 
-O mapeamento e o mesmo do launcher Windows, e a razao dele vale aqui igual:
-`-bots N` diz quantos companheiros entram, e `-copilot 0|1` diz se o bot dirige
-o SEU personagem. Sao coisas separadas desde que a engine ganhou o parametro --
-com `-bots` sozinho, qualquer numero de 1 a 3 desligava o copiloto.
+`-bots N` diz quantos companheiros entram; `-copilot 0|1` diz se o bot dirige o
+SEU personagem. Sao coisas separadas desde que a engine ganhou o parametro --
+com `-bots` sozinho, qualquer numero de 1 a 3 desligava o copiloto, e so
+`-bots 4` o trazia de volta.
 """
 
 from __future__ import annotations

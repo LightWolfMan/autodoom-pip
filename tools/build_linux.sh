@@ -1,13 +1,13 @@
 #!/bin/bash
 # Compila o AutoDoom com o patch PIP + copiloto no Linux.
 #
-# Nao ha porte: a engine ja e multiplataforma (o Eternity traz CMakeLists
-# completo) e o patch nao usa uma linha de API do Windows. O `b_vote.cpp` entra
-# no build sozinho porque `source/CMakeLists.txt` monta a lista com
-# FILE (GLOB autodoom/*.cpp) -- so o .vcxproj do MSVC precisou de linha manual.
+# A engine e multiplataforma por projeto (o Eternity traz CMakeLists completo) e
+# o patch e C++ comum sobre a biblioteca padrao. O `b_vote.cpp` entra no build
+# sozinho porque `source/CMakeLists.txt` monta a lista com
+# FILE (GLOB autodoom/*.cpp).
 #
-# Verificado em 19/08/2026 numa Ubuntu 24.04 (WSL2): cmake 3.28.3, GCC 13.3,
-# SDL2 2.30. Compilou de primeira, zero erros, zero mudanca de codigo.
+# Verificado em 19/08/2026 numa Ubuntu 24.04: cmake 3.28.3, GCC 13.3, SDL2 2.30.
+# Compilou de primeira, zero erros, zero mudanca de codigo.
 set -e
 
 REPO=${1:-https://github.com/ioan-chera/AutoDoom.git}

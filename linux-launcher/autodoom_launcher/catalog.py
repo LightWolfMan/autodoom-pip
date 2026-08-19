@@ -1,14 +1,13 @@
 """Onde os IWADs moram no Linux, e como achar os que estao fora do caminho.
 
-O launcher do Windows varre o journal do NTFS para achar WAD espalhado pelo
-disco. Isso nao existe aqui: o ext4 nao guarda um diario de nomes consultavel, e
-o `fanotify`, que e o mais parecido em espirito, so ve eventos ao vivo -- nao
-serve para descobrir o que ja esta no disco, e ainda exige CAP_SYS_ADMIN.
+Procurar arquivo por arquivo num disco inteiro leva minutos, e o sistema ja tem
+uma resposta melhor: o `plocate`, com banco indexado -- `locate '*.wad'` responde
+em milissegundos, roda sem privilegio nenhum e ja vem na maioria dos desktops
+Debian e Arch. O `fanotify` do kernel ve eventos ao vivo, mas nao serve aqui:
+nao conta o que ja esta no disco e ainda exige CAP_SYS_ADMIN.
 
-O substituto e o `plocate`: banco indexado, `locate '*.wad'` responde em
-milissegundos, roda sem privilegio nenhum e ja vem instalado na maioria dos
-desktops Debian e Arch. Quando ele nao existe, sobra varrer as pastas conhecidas
--- que e o que a maioria das instalacoes precisa de qualquer forma.
+Quando o `plocate` nao esta instalado, sobra varrer as pastas conhecidas -- que e
+o que a maioria das instalacoes precisa de qualquer forma.
 """
 
 from __future__ import annotations

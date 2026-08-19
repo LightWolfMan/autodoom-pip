@@ -1,8 +1,8 @@
 """Leitura de WAD: o suficiente para reconhecer um IWAD e nomear o jogo.
 
-Porte direto do IwadCatalog.cs/WadValidator.cs do launcher Windows. O formato e
-o mesmo em qualquer sistema: 12 bytes de cabecalho (magica, numero de lumps,
-posicao do diretorio) e um diretorio de entradas de 16 bytes.
+O formato do WAD e de 1993 e nao mudou: 12 bytes de cabecalho (magica, numero
+de lumps, posicao do diretorio) e um diretorio de entradas de 16 bytes cada --
+oito de nome, mais posicao e tamanho.
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ import os
 import struct
 from dataclasses import dataclass
 
-# Nome de arquivo -> jogo. Vale o mesmo mapa do Windows; o que muda e onde
-# procurar, nao o que procurar.
+# Nome de arquivo -> jogo. Os nomes sao os mesmos desde sempre, venham de um CD
+# antigo, do GOG ou do pacote freedoom da distro.
 KNOWN_IWADS = {
     "doom.wad": "DOOM",  # refinado depois: o Ultimate tem episodio 4
     "doom1.wad": "DOOM (Shareware)",
