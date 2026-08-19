@@ -15,8 +15,7 @@ internal sealed class MainForm : Form
    private readonly string _gameDir;
    private readonly LauncherSettings _settings;
 
-   private readonly RadioButton _rbCopilot = new();
-   private readonly RadioButton _rbCoop    = new();
+   private readonly CheckBox    _cbCopilot = new();
    private readonly ListBox     _lbIwads   = new();
    private readonly ComboBox    _cbPwad    = new();
    private readonly Button      _btnPlay   = new();
@@ -44,7 +43,7 @@ internal sealed class MainForm : Form
    private readonly Label       _detMaps = new();
 
    /// <summary>Os quatro numeros sob o slider; o corrente vai em azul negrito.</summary>
-   private readonly Label[]     _botTicks = new Label[MaxBots];
+   private readonly Label[]     _botTicks = new Label[MaxCompanions + 1];
 
    /// <summary>Slider e spinner mostram o mesmo valor; a trava evita o pingue-pongue.</summary>
    private bool _syncingBots;
@@ -62,6 +61,13 @@ internal sealed class MainForm : Form
 
    /// <summary>Slots de jogador da engine: MAXPLAYERS 4 em doomdef.h:70.</summary>
    private const int MaxBots = 4;
+
+   /// <summary>
+   /// Companheiros possiveis: os slots 2 a 4, porque o 1 e sempre o seu. O
+   /// copiloto nao gasta slot -- ele dirige o seu personagem -- entao os dois
+   /// controles agora sao independentes.
+   /// </summary>
+   private const int MaxCompanions = MaxBots - 1;
 
    /// <summary>
    /// Medidas unicas de botao. Largura igual em toda a janela e o que faz a coluna
@@ -427,19 +433,13 @@ internal sealed class MainForm : Form
 
    private Control BuildModeGroup()
    {
-      _rbCopilot.Text      = "";
-      _rbCopilot.AutoSize  = true;
-      _rbCopilot.Anchor    = AnchorStyles.Left;
-      _rbCopilot.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
-      _rbCopilot.Checked   = true;
-      _rbCopilot.ForeColor = SystemColors.ControlText;
-
-      _rbCoop.Text      = "";
-      _rbCoop.AutoSize  = true;
-      _rbCoop.Anchor    = AnchorStyles.Left;
-      _rbCoop.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
-      _rbCoop.ForeColor = SystemColors.ControlText;
-      _rbCoop.CheckedChanged += (_, _) => UpdateEnabledState();
+      _cbCopilot.Text      = "";
+      _cbCopilot.AutoSize  = true;
+      _cbCopilot.Anchor    = AnchorStyles.Left;
+      _cbCopilot.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
+      _cbCopilot.Checked   = true;
+      _cbCopilot.ForeColor = SystemColors.ControlText;
+      _cbCopilot.CheckedChanged += (_, _) => UpdateEnabledState();
 
       var rows = new TableLayoutPanel
       {
@@ -455,13 +455,17 @@ internal sealed class MainForm : Form
       rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
       rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-      rows.Controls.Add(_rbCopilot, 0, 0);
+      // Linha 1: o interruptor do copiloto. Linha 2: quantos companheiros. As
+      // duas eram exclusivas ate a v2 e agora se combinam livremente -- e o
+      // -copilot da engine que separa uma coisa da outra.
+      rows.Controls.Add(_cbCopilot, 0, 0);
       rows.Controls.Add(MakeGlyph(_icoOne, new Padding(0, 0, LogicalToDeviceUnits(10), 0)), 1, 0);
-      rows.Controls.Add(BuildModeText(Strings.ModeCopilotName, Strings.ModeCopilotDesc, _rbCopilot, null), 2, 0);
+      rows.Controls.Add(BuildModeText(Strings.ModeCopilotName, Strings.ModeCopilotDesc,
+                                      () => _cbCopilot.Checked = !_cbCopilot.Checked, null), 2, 0);
 
-      rows.Controls.Add(_rbCoop, 0, 1);
       rows.Controls.Add(MakeGlyph(_icoTwo, new Padding(0, LogicalToDeviceUnits(12), LogicalToDeviceUnits(10), 0)), 1, 1);
-      rows.Controls.Add(BuildModeText(Strings.ModeCoopName, Strings.ModeCoopDesc, _rbCoop, BuildBotsRow()), 2, 1);
+      rows.Controls.Add(BuildModeText(Strings.CompanionsName, Strings.CompanionsDesc,
+                                      null, BuildBotsRow()), 2, 1);
 
       var rule = new Panel
       {
@@ -500,7 +504,7 @@ internal sealed class MainForm : Form
    /// linha. Clicar em qualquer parte do texto marca o radio, que fica sem texto
    /// proprio; o mnemonico vive no rotulo e cai no radio pela ordem de tabulacao.
    /// </summary>
-   private Control BuildModeText(string name, string description, RadioButton radio, Control? extra)
+   private Control BuildModeText(string name, string description, Action? onClick, Control? extra)
    {
       Label title = MakeText(name, _modeNameFont, SystemColors.ControlText);
       title.UseMnemonic = true;
@@ -509,8 +513,11 @@ internal sealed class MainForm : Form
       Label desc = MakeText(description, _modeDescFont, SystemColors.ControlText);
       desc.Margin = new Padding(0, 0, LogicalToDeviceUnits(14), 0);
 
-      foreach (Label label in new[] { title, desc })
-         label.Click += (_, _) => radio.Checked = true;
+      if (onClick is not null)
+      {
+         foreach (Label label in new[] { title, desc })
+            label.Click += (_, _) => onClick();
+      }
 
       var line = new TableLayoutPanel
       {
@@ -536,8 +543,8 @@ internal sealed class MainForm : Form
    /// <summary>Slider com a regua 1..4 embaixo, o spinner do valor e a palavra "bots".</summary>
    private Control BuildBotsRow()
    {
-      _tbBots.Minimum       = 1;
-      _tbBots.Maximum       = MaxBots;
+      _tbBots.Minimum       = 0;
+      _tbBots.Maximum       = MaxCompanions;
       _tbBots.TickFrequency = 1;
       _tbBots.SmallChange   = 1;
       _tbBots.LargeChange   = 1;
@@ -549,18 +556,18 @@ internal sealed class MainForm : Form
 
       var scale = new TableLayoutPanel
       {
-         ColumnCount = MaxBots,
+         ColumnCount = MaxCompanions + 1,
          RowCount    = 1,
          Dock        = DockStyle.Fill,
          Margin      = new Padding(0),
       };
       scale.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-      for (int i = 0; i < MaxBots; i++)
+      for (int i = 0; i <= MaxCompanions; i++)
       {
-         scale.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / MaxBots));
+         scale.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / (MaxCompanions + 1)));
          _botTicks[i] = new Label
          {
-            Text      = (i + 1).ToString(),
+            Text      = i.ToString(),
             Dock      = DockStyle.Fill,
             TextAlign = ContentAlignment.TopCenter,
             Font      = _smallFont,
@@ -585,8 +592,8 @@ internal sealed class MainForm : Form
       slider.Controls.Add(_tbBots, 0, 0);
       slider.Controls.Add(scale,   0, 1);
 
-      _nudBots.Minimum   = 1;
-      _nudBots.Maximum   = MaxBots;
+      _nudBots.Minimum   = 0;
+      _nudBots.Maximum   = MaxCompanions;
       _nudBots.Value     = _tbBots.Value;
       _nudBots.Width     = LogicalToDeviceUnits(56);
       _nudBots.TextAlign = HorizontalAlignment.Center;
@@ -1378,9 +1385,10 @@ internal sealed class MainForm : Form
 
    private void LoadState()
    {
-      _rbCoop.Checked    = _settings.Mode == PlayMode.Coop;
-      _rbCopilot.Checked = !_rbCoop.Checked;
-      _tbBots.Value      = Math.Clamp(_settings.BotCount, 1, MaxBots);
+      // launcher.json sem a chave Copilot vem da v2, quando os modos eram
+      // exclusivos: la, Coop significava exatamente "sem copiloto".
+      _cbCopilot.Checked = _settings.Copilot ?? _settings.Mode != PlayMode.Coop;
+      _tbBots.Value      = Math.Clamp(_settings.BotCount, 0, MaxCompanions);
       _cbWeapons.Checked = _settings.WeaponsDisappear;
       _cbJump.Checked    = GameConfig.JumpEnabled(_gameDir);
       _cbFollow.SelectedIndex = Math.Clamp(GameConfig.PipFollow(_gameDir), 0, 1);
@@ -1467,7 +1475,8 @@ internal sealed class MainForm : Form
 
    private void SaveState()
    {
-      _settings.Mode         = _rbCoop.Checked ? PlayMode.Coop : PlayMode.Copilot;
+      _settings.Copilot      = _cbCopilot.Checked;
+      _settings.Mode         = _cbCopilot.Checked ? PlayMode.Copilot : PlayMode.Coop;
       _settings.BotCount     = _tbBots.Value;
       _settings.Pip          = _cbPip.Checked;
       _settings.WeaponsDisappear = _cbWeapons.Checked;
@@ -1485,7 +1494,9 @@ internal sealed class MainForm : Form
    private void UpdateEnabledState()
    {
       _btnPlay.Enabled = _lbIwads.SelectedItem is IwadEntry && !_scanning;
-      _tbBots.Enabled      = _rbCoop.Checked;
+      // O numero de companheiros nao depende mais do copiloto: as duas escolhas
+      // sao independentes, entao o slider fica sempre ativo.
+      _tbBots.Enabled      = true;
       _cbFollow.Enabled    = _cbPip.Enabled && _cbPip.Checked;
       _lblFollow.Enabled   = _cbFollow.Enabled;
       UpdateBotHint();
@@ -1499,23 +1510,16 @@ internal sealed class MainForm : Form
    {
       HighlightBotTick();
 
-      // Um modo por vez na caixa: a explicacao do Copiloto so interessa a quem
-      // esta no Copiloto. Invisivel em vez de vazio, senao a linha ocupa altura.
-      _lblCopilotHint.Visible = !_rbCoop.Checked;
-
-      if (!_rbCoop.Checked)
-      {
-         _lblBotHint.Text = "";
-         // Escondido, e nao so vazio: um controle invisivel nao ocupa linha nem
-         // margem no layout, entao a caixa de aviso encolhe junto.
-         _lblBotHint.Visible = false;
-         return;
-      }
+      // As duas linhas da caixa contam as duas escolhas, que agora sao
+      // independentes: a de cima diz quem dirige o seu personagem, a de baixo
+      // quantos companheiros entram.
+      _lblCopilotHint.Visible = true;
+      _lblCopilotHint.Text = _cbCopilot.Checked ? Strings.CopilotHint : Strings.CopilotOffHint;
 
       _lblBotHint.Visible = true;
-      _lblBotHint.Text = _tbBots.Value >= MaxBots
-         ? Strings.BotHintFull(MaxBots)
-         : Strings.BotHintPartial(_tbBots.Value, MaxBots);
+      _lblBotHint.Text = _tbBots.Value == 0
+         ? Strings.CompanionsHintNone
+         : Strings.CompanionsHint(_tbBots.Value, MaxCompanions);
    }
 
    /// <summary>O numero corrente da regua em azul negrito, o resto em cinza.</summary>
@@ -1527,7 +1531,7 @@ internal sealed class MainForm : Form
          if (tick is null)
             continue;
 
-         bool current = i + 1 == _tbBots.Value;
+         bool current = i == _tbBots.Value;
          tick.Font      = current ? (_titleFont ?? Font) : (_smallFont ?? Font);
          tick.ForeColor = current ? AccentColor : SystemColors.GrayText;
       }
@@ -1865,8 +1869,14 @@ internal sealed class MainForm : Form
       if (_lbIwads.SelectedItem is not IwadEntry iwad)
          return;
 
-      bool usePip = _cbPip.Checked && File.Exists(Path.Combine(_gameDir, PipExeName));
-      string exeName = usePip ? PipExeName : GameExeName;
+      // O autodoom_pip.exe e o executavel do projeto e um superconjunto do
+      // original: sem -pip ele se comporta igual. Rodar sempre por ele mantem o
+      // -copilot valendo mesmo com o quadrinho desligado -- o AutoDoom.exe de
+      // fabrica ignora o parametro em silencio, e a combinacao "copiloto com 1
+      // companheiro" sairia errada sem aviso.
+      bool hasPipExe = File.Exists(Path.Combine(_gameDir, PipExeName));
+      bool usePip    = _cbPip.Checked && hasPipExe;
+      string exeName = hasPipExe ? PipExeName : GameExeName;
       string exe = Path.Combine(_gameDir, exeName);
       if (!File.Exists(exe))
       {
@@ -1887,13 +1897,18 @@ internal sealed class MainForm : Form
       if (usePip)
          psi.ArgumentList.Add("-pip");
 
-      // Copiloto e a ausencia de -bots: sem ele o bot dirige o proprio jogador
-      // (G_AdjustNetBotSettings nao roda e bots[0].active fica true).
-      if (_rbCoop.Checked)
+      // Companheiros e copiloto viajam separados. O -bots so diz quantos
+      // jogadores-bot entram; quem decide se o SEU personagem tambem anda
+      // sozinho e o -copilot, que existe justamente porque no -bots puro
+      // qualquer numero de 1 a 3 desligava o copiloto.
+      if (_tbBots.Value > 0)
       {
          psi.ArgumentList.Add("-bots");
          psi.ArgumentList.Add(_tbBots.Value.ToString());
       }
+
+      psi.ArgumentList.Add("-copilot");
+      psi.ArgumentList.Add(_cbCopilot.Checked ? "1" : "0");
 
       // dmflags 0 tira o DM_WEAPONSTAY que o Coop liga por padrao (g_dmflag.h:47),
       // fazendo a arma sumir ao ser pega, como no single player.

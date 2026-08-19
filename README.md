@@ -46,7 +46,7 @@ loose ends of running AutoDoom together.
   the game's translation tables, and flashes white when they take a hit. Health and ammo are
   printed under the box, in the same colour.
 - **Friendly fire switch** — co-op in Doom lets players hurt each other; you can turn that off.
-- **Launcher** — IWAD and PWAD pickers, Copilot and Co-op modes, bot count, and a WAD finder
+- **Launcher** — IWAD and PWAD pickers, a copilot switch, 0–3 bot companions, and a WAD finder
   that reads the NTFS journal instead of walking the disk.
 - **Nobody leaves without asking** — a bot that reaches the exit switch stops there and asks
   you, with the engine's own yes/no prompt. Say no and the level gets another minute before
@@ -89,12 +89,17 @@ original `AutoDoom.exe` is never touched.
 
 ## Usage
 
-Open the launcher, pick an IWAD, choose a mode and press **Play**.
+Open the launcher, pick an IWAD, set the two switches below and press **Play**.
 
-| Mode | What happens |
+| Switch | What happens |
 | --- | --- |
-| **Copilot** | The bot plays your character and hands control back the moment you touch the keys, taking it again a second after you stop. |
-| **Co-op** | You play alongside 1–4 bots. Four is the engine ceiling (`MAXPLAYERS`), and at four your own character goes on autopilot too, because no slot is left. |
+| **Copilot** | On: the bot plays *your* character and hands control back the moment you touch the keys, taking it again a second after you stop. Off: you play your own character throughout. |
+| **Bot companions** | 0 to 3 extra bot players, filling slots 2 to 4. Three is the engine ceiling — `MAXPLAYERS` is 4 and one slot is yours. |
+
+The two are independent, which stock `-bots` cannot express: any count from 1 to 3 turned
+the copilot off, and only `-bots 4` brought it back. The engine gained a `-copilot <0|1>`
+parameter that decides `bots[0].active` after the `-bots` rule has run, so "one companion
+**and** the copilot" is now a thing. Without the parameter nothing changes.
 
 In game:
 
@@ -239,7 +244,7 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   das tabelas de tradução do próprio jogo, e pisca de branco quando ele leva dano. Vida e
   munição saem embaixo do quadro, na mesma cor.
 - **Fogo amigo** — no coop do Doom os jogadores se ferem; dá para desligar.
-- **Launcher** — escolha de IWAD e PWAD, modos Copiloto e Coop, número de bots, e um detector de
+- **Launcher** — escolha de IWAD e PWAD, interruptor de copiloto, 0 a 3 bots companheiros, e um detector de
   WADs que lê o journal do NTFS em vez de varrer o disco.
 - **Ninguém sai sem perguntar** — o bot que chega no botão da saída para ali e pergunta, com o
   mesmo diálogo de sim/não que a engine usa para sair do jogo. Diga não e o mapa ganha mais um
@@ -282,10 +287,15 @@ tocado.
 
 ## Como usar
 
-| Modo | O que acontece |
+| Interruptor | O que acontece |
 | --- | --- |
-| **Copiloto** | O bot joga o seu personagem e devolve o controle no instante em que você toca nas teclas, retomando um segundo depois que você para. |
-| **Coop** | Você joga ao lado de 1 a 4 bots. Quatro é o teto da engine (`MAXPLAYERS`), e nele o seu personagem também entra no piloto automático, porque não sobra vaga. |
+| **Copiloto** | Ligado: o bot joga o *seu* personagem e devolve o controle no instante em que você toca nas teclas, retomando um segundo depois que você para. Desligado: você joga o seu personagem do início ao fim. |
+| **Bots companheiros** | De 0 a 3 jogadores-bot extras, nos slots 2 a 4. Três é o teto da engine — `MAXPLAYERS` é 4 e um slot é o seu. |
+
+Os dois são independentes, o que o `-bots` original não sabia dizer: qualquer número de 1 a
+3 desligava o copiloto, e só o `-bots 4` o trazia de volta. A engine ganhou um parâmetro
+`-copilot <0|1>` que decide o `bots[0].active` depois da regra do `-bots`, então "um
+companheiro **e** o copiloto" agora existe. Sem o parâmetro, nada muda.
 
 No jogo:
 

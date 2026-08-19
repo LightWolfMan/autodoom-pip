@@ -446,7 +446,7 @@ index 00000000..2bb2c7c2
 +
 +// EOF
 diff --git a/source/d_main.cpp b/source/d_main.cpp
-index 88b20bf8..2d2b4694 100644
+index 88b20bf8..39edb5f0 100644
 --- a/source/d_main.cpp
 +++ b/source/d_main.cpp
 @@ -79,6 +79,13 @@
@@ -758,10 +758,16 @@ index 88b20bf8..2d2b4694 100644
           }
           
           ST_Drawer(scaledwindow.height == SCREENHEIGHT);  // killough 11/98
-@@ -1722,6 +2010,10 @@ static void D_DoomInit()
+@@ -1722,6 +2010,16 @@ static void D_DoomInit()
     if((p = M_CheckParm("-bots")) && p < myargc - 1)
        netbot = atoi(myargv[p + 1]);
  
++   // -copilot <0|1>: separa o bot que dirige o SEU personagem da contagem de
++   // companheiros. Sem o parametro nada muda -- vale a regra antiga do -bots.
++   copilot_mode = -1;
++   if((p = M_CheckParm("-copilot")) && p < myargc - 1)
++      copilot_mode = atoi(myargv[p + 1]) != 0;
++
 +   // PIP: liga o quadrinho com a visao de outro jogador
 +   if(M_CheckParm("-pip"))
 +      pip_active = 1;
@@ -769,6 +775,18 @@ index 88b20bf8..2d2b4694 100644
     if((netgame || M_CheckParm("-solo-net") || netbot) &&
        GameType == gt_single)
     {
+diff --git a/source/doomstat.h b/source/doomstat.h
+index 544834d2..e36608ce 100644
+--- a/source/doomstat.h
++++ b/source/doomstat.h
+@@ -276,6 +276,7 @@ extern  bool usergame;
+ extern  bool demoplayback;
+ extern  bool demorecording;
+ extern  int  netbot;
++extern  int  copilot_mode;   // -1 = pela regra do -bots; 0/1 forca
+ 
+ // Quit after playing a demo from cmdline.
+ extern  bool singledemo;
 diff --git a/source/g_cmd.cpp b/source/g_cmd.cpp
 index d1a56c42..a247293c 100644
 --- a/source/g_cmd.cpp
@@ -815,7 +833,7 @@ index d1a56c42..a247293c 100644
     {
        if(i >= MAXPLAYERS)
 diff --git a/source/g_game.cpp b/source/g_game.cpp
-index 320fcbc7..63f8974b 100644
+index 320fcbc7..bc4c339b 100644
 --- a/source/g_game.cpp
 +++ b/source/g_game.cpp
 @@ -38,6 +38,7 @@
@@ -826,7 +844,19 @@ index 320fcbc7..63f8974b 100644
  #include "c_io.h"
  #include "c_net.h"
  #include "c_runcmd.h"
-@@ -2287,6 +2288,8 @@ void G_Ticker()
+@@ -144,6 +145,11 @@ bool            democontinue;
+ bool            demorecording;
+ bool            demoplayback;
+ int             netbot;               // number of single-player helper bots
++// Copiloto: -1 deixa a regra do -bots decidir (comportamento antigo), 0 e 1
++// forcam o bot que dirige o SEU personagem a desligar ou ligar. Existe para
++// que "jogar com 1 bot companheiro E com o copiloto ligado" seja possivel:
++// pelo -bots sozinho, qualquer numero de 1 a 3 desliga o copiloto.
++int             copilot_mode = -1;
+ bool            singledemo;           // quit after playing a demo from cmdline
+ bool            precache = true;      // if true, load all graphics at start
+ wbstartstruct_t wminfo;               // parms for world map / intermission
+@@ -2287,6 +2293,8 @@ void G_Ticker()
     else
     {
        // get commands, check consistency, and build new consistancy check
@@ -835,6 +865,19 @@ index 320fcbc7..63f8974b 100644
        int buf = (gametic / ticdup) % BACKUPTICS;
        
        for(i=0; i<MAXPLAYERS; i++)
+@@ -3244,6 +3252,12 @@ void G_AdjustNetBotSettings()
+          bots[0].active = true;
+       netgame = true;
+    }
++
++   // O -copilot manda mais alto que tudo acima: e ele que separa "quantos
++   // companheiros" de "o bot dirige o meu personagem", que no -bots eram a
++   // mesma escolha.
++   if(copilot_mode >= 0)
++      bots[0].active = copilot_mode != 0;
+ }
+ 
+ //
 diff --git a/source/hu_frags.cpp b/source/hu_frags.cpp
 index 27eebb8e..5e66f9e7 100644
 --- a/source/hu_frags.cpp

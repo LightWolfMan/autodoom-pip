@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AutoDoomLauncher;
@@ -17,10 +17,23 @@ internal sealed class LauncherSettings
 {
    public const string DefaultSoundfont = @"E:\Jogos\GZDoom\soundfonts\ToH(XGM)4.00(G).sf2";
 
+   /// <summary>
+   /// Legado: ate a v2 o launcher tinha dois modos exclusivos. Continua sendo
+   /// lido para converter o launcher.json antigo -- Coop virava "sem copiloto"
+   /// -- e nada mais depende dele.
+   /// </summary>
    public PlayMode Mode { get; set; } = PlayMode.Copilot;
 
-   /// <summary>Quantos jogadores-bot no modo Coop. A engine so tem 4 slots
-   /// (MAXPLAYERS em doomdef.h:70), entao o teto e 4.</summary>
+   /// <summary>
+   /// O bot dirige o SEU personagem? Deixou de ser um modo e virou um
+   /// interruptor: da para ter copiloto e companheiros ao mesmo tempo.
+   /// Nulo significa launcher.json antigo, sem a chave -- quem decide entao e
+   /// o `Mode`.
+   /// </summary>
+   public bool? Copilot { get; set; }
+
+   /// <summary>Quantos bots companheiros, de 0 a 3. A engine tem 4 slots
+   /// (MAXPLAYERS em doomdef.h:70) e um deles e o seu.</summary>
    public int BotCount { get; set; } = 3;
    public string? LastIwadPath { get; set; }
    /// <summary>PWAD escolhido no dropdown; vazio ou nulo significa nenhum.</summary>

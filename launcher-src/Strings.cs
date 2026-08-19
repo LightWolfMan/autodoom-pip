@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace AutoDoomLauncher;
 
@@ -129,21 +129,30 @@ internal static class Strings
 
    public static string ModeCoopDesc => Pick("voce joga com", "you play with");
 
+   /// <summary>Rotulo da linha de companheiros, que agora e independente do copiloto.</summary>
+   public static string CompanionsName => Pick("Bots &companheiros:", "Bot &companions:");
+
+   public static string CompanionsDesc => Pick("entram como jogadores 2 a 4", "join as players 2 to 4");
+
    public static string CameraCardTitle => Pick("A camera segue:", "The camera follows:");
 
    public static string BotsWord => "bots";
 
    public static string CopilotHint => Pick(
-      "No modo Copiloto o bot solta o controle por 1 segundo a cada toque seu nas teclas.",
-      "In Copilot mode the bot releases control for 1 second each time you touch the keys.");
+      "Com o copiloto ligado o bot dirige o seu personagem e solta o controle por 1 segundo a cada toque seu nas teclas.",
+      "With the copilot on, the bot drives your character and releases control for 1 second each time you touch the keys.");
 
-   public static string BotHintFull(int max) => Pick(
-      $"Com {max} bots a engine ocupa todos os slots e o seu personagem tambem entra no piloto automatico.",
-      $"With {max} bots the engine fills every slot and your own character goes on autopilot too.");
+   public static string CopilotOffHint => Pick(
+      "Sem copiloto voce joga o seu personagem do inicio ao fim.",
+      "With the copilot off you play your own character from start to finish.");
 
-   public static string BotHintPartial(int count, int max) => Pick(
-      $"{count} companheiro(s) de bot; voce controla o seu personagem. Maximo de {max} slots.",
-      $"{count} bot companion(s); you control your own character. {max} slots at most.");
+   public static string CompanionsHintNone => Pick(
+      "Sem companheiros: so o seu personagem no mapa.",
+      "No companions: your character alone on the map.");
+
+   public static string CompanionsHint(int count, int max) => Pick(
+      $"{count} companheiro(s) de bot, nos slots 2 a {count + 1}. Maximo de {max}.",
+      $"{count} bot companion(s), in slots 2 to {count + 1}. {max} at most.");
 
    // ------------------------------------------------------------- botoes
 
