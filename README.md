@@ -53,6 +53,8 @@ loose ends of running AutoDoom together.
   anyone asks again.
 - **Co-op scoreboard** — hold `F` for a ranking by kills. Eternity's scoreboard was deathmatch
   only; a small patch opens it up.
+- **Game logos in the list** — each IWAD shows its own logo, read straight out of that WAD
+  (`M_DOOM`), and they are listed in release order.
 - **Bilingual** — the launcher always follows your Windows language, English or Portuguese, with
   nothing to configure.
 - **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
@@ -244,6 +246,8 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   minuto antes de alguém perguntar de novo.
 - **Placar no coop** — segure `F` para o ranking por abates. O placar do Eternity só valia em
   deathmatch; um patch pequeno abriu.
+- **Logos dos jogos na lista** — cada IWAD mostra o próprio logo, lido de dentro daquele WAD
+  (`M_DOOM`), e a lista vem em ordem de lançamento.
 - **Bilíngue** — o launcher sempre acompanha o idioma do Windows, português ou inglês, sem nada
   para configurar.
 - **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
