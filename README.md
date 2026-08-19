@@ -4,8 +4,7 @@
 
 **Picture-in-picture and a friendly launcher for [AutoDoom](https://github.com/ioan-chera/AutoDoom) — Ioan Chera's Eternity Engine fork with a pathfinding bot.**
 
-[![Release](https://img.shields.io/github/v/release/LightWolfMan/autodoom-pip?label=release)](https://github.com/LightWolfMan/autodoom-pip/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/LightWolfMan/autodoom-pip/total)](https://github.com/LightWolfMan/autodoom-pip/releases)
+[![Launcher](https://img.shields.io/badge/launcher-1.0--rc1-informational)](linux-launcher)
 [![Engine](https://img.shields.io/badge/engine-GPL--3.0-blue)](COPYING-GPLv3)
 [![Launcher](https://img.shields.io/badge/launcher-MIT-green)](LICENSE-launcher.md)
 [![Platform](https://img.shields.io/badge/platform-Linux-orange)](#requirements)
@@ -57,8 +56,8 @@ loose ends of running AutoDoom together.
   anyone asks again.
 - **Co-op scoreboard** — hold `F` for a ranking by kills. Eternity's scoreboard was deathmatch
   only; a small patch opens it up.
-- **Game logos in the list** — each IWAD shows its own logo, read straight out of that WAD
-  (`M_DOOM`), and they are listed in release order.
+- **Games in release order** — the IWAD list follows the order the games came out, not the
+  alphabet, and `doom.wad` is told apart from the Ultimate edition by looking for `E4M1`.
 - **Bilingual** — the launcher follows your system language, English or Portuguese, with nothing
   to configure.
 - **Non-destructive** — the patched binary sits *beside* a stock AutoDoom build, never on top of it.
@@ -103,7 +102,7 @@ There is no binary release for Linux yet — you build it, and it takes one comm
 **Debian / Ubuntu**
 
 ```
-sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
+sudo apt install build-essential cmake git pkg-config \n     libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
 ```
 
 **Arch**
@@ -188,7 +187,7 @@ Eternity ships a full `CMakeLists.txt`, and the patch is plain C++ on the standa
 because `source/CMakeLists.txt` collects sources with `FILE (GLOB autodoom/*.cpp)`.
 
 ```
-sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev
+sudo apt install build-essential cmake git pkg-config \n     libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev
 git clone --branch AutoDoom https://github.com/ioan-chera/AutoDoom.git && cd AutoDoom
 git submodule update --init --recursive
 git apply /path/to/autodoom-pip.patch
@@ -232,8 +231,8 @@ a player instead.
   not the logo drawn from inside the WAD — and a PWAD is chosen by hand, without the
   compatibility check.
 - Finding WADs depends on `plocate`'s database. A WAD created after the last `updatedb` run is
-  invisible until the next one — run `sudo updatedb` if something is missing. There is no
-  the filesystem keeps no queryable diary of file names, so an index is the only fast answer.
+  invisible until the next one — run `sudo updatedb` if something is missing. The filesystem
+  keeps no queryable diary of file names, so an index is the only fast answer.
 - `pip_count` above `1` is implemented but has had little real use.
 - No crouching: there is no crouch code anywhere in Eternity, only an unused ACS constant.
 
@@ -250,7 +249,7 @@ This repository carries two works with different origins.
 | Part | Licence | Why |
 | --- | --- | --- |
 | The patched engine, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derived from the Eternity Engine and AutoDoom. The modified source is published [here](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
-| Launcher, installer script | [MIT](LICENSE-launcher.md) | Written from scratch; does not derive from Eternity. |
+| The launcher in `linux-launcher/` | [MIT](LICENSE-launcher.md) | Written from scratch; does not derive from Eternity. |
 
 ## Credits
 
@@ -305,8 +304,8 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   minuto antes de alguém perguntar de novo.
 - **Placar no coop** — segure `F` para o ranking por abates. O placar do Eternity só valia em
   deathmatch; um patch pequeno abriu.
-- **Logos dos jogos na lista** — cada IWAD mostra o próprio logo, lido de dentro daquele WAD
-  (`M_DOOM`), e a lista vem em ordem de lançamento.
+- **Jogos em ordem de lançamento** — a lista de IWAD segue a ordem em que os jogos saíram, não
+  o alfabeto, e o `doom.wad` é distinguido do Ultimate procurando o `E4M1` dentro dele.
 - **Bilíngue** — o launcher acompanha o idioma do sistema, português ou inglês, sem nada
   para configurar.
 - **Não destrutivo** — o binário com o patch fica *ao lado* de um AutoDoom comum, nunca por cima.
@@ -351,7 +350,7 @@ Ainda não há release binária para Linux — aqui você compila, e é um coman
 **Debian / Ubuntu**
 
 ```
-sudo apt install build-essential cmake git pkg-config      libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
+sudo apt install build-essential cmake git pkg-config \n     libsdl2-dev libsdl2-mixer-dev libsdl2-net-dev plocate
 ```
 
 **Arch**
@@ -470,4 +469,4 @@ pensamento do bot.
 | Parte | Licença | Por quê |
 | --- | --- | --- |
 | A engine com o patch, `autodoom-pip.patch` | [GPL-3.0](COPYING-GPLv3) | Derivado do Eternity Engine e do AutoDoom. O fonte modificado está publicado [aqui](https://github.com/LightWolfMan/AutoDoom/tree/pip-view). |
-| Launcher, script de instalação | [MIT](LICENSE-launcher.md) | Escrito do zero; não deriva do Eternity. |
+| O launcher em `linux-launcher/` | [MIT](LICENSE-launcher.md) | Escrito do zero; não deriva do Eternity. |

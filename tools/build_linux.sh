@@ -11,8 +11,17 @@
 set -e
 
 REPO=${1:-https://github.com/ioan-chera/AutoDoom.git}
-PATCH=${2:-$(dirname "$0")/../dist/autodoom-pip/autodoom-pip.patch}
+# O patch mora na raiz do repositorio, um nivel acima deste script. O caminho
+# e resolvido a partir do proprio script, e nao do diretorio atual, para o
+# comando funcionar de onde quer que voce chame.
+PATCH=${2:-$(cd "$(dirname "$0")/.." && pwd)/autodoom-pip.patch}
 DEST=${3:-$HOME/AutoDoom}
+
+if [ ! -f "$PATCH" ]; then
+   echo "Patch nao encontrado em: $PATCH" >&2
+   echo "Passe o caminho como segundo argumento: $0 <repo> <patch> <destino>" >&2
+   exit 1
+fi
 
 echo "== dependencias =="
 sudo apt-get update -qq
