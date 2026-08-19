@@ -12,7 +12,9 @@
 
 **English** · [Português](#português)
 
-<img src="docs/pip.png" alt="AutoDoom with the picture-in-picture box in the top-left corner, showing another bot's view" width="820">
+<img src="docs/linux-pip.png" alt="AutoDoom running on Linux, with the picture-in-picture box in the top-left corner showing another bot's view" width="820">
+
+<sub>Built and captured on Ubuntu 24.04. This branch carries the Linux side of the project; the screenshots on <code>main</code> are the Windows ones.</sub>
 
 </div>
 
@@ -59,13 +61,15 @@ loose ends of running AutoDoom together.
   nothing to configure.
 - **Non-destructive** — installs *beside* your `AutoDoom.exe`, never replacing it.
 
-<img src="docs/launcher-en.png" alt="The AutoDoom Launcher window" width="520">
+> **On this branch there is no launcher screenshot.** The launcher is WinForms, which does not
+> run on Linux, so nothing here could show it honestly. Porting it is step 2; see
+> [Building from source → On Linux](#on-linux) for what already works.
 
 ## Requirements
 
 | | |
 | --- | --- |
-| OS | Windows 10 or 11 |
+| OS | Windows 10/11, **or Linux** — the engine builds and runs there; the launcher does not (yet) |
 | Game | An existing [AutoDoom](https://github.com/ioan-chera/AutoDoom) install, with `AutoDoom.exe` and the SDL2 DLLs |
 | IWAD | Any Doom, Doom II, Final Doom, Heretic or Freedoom IWAD |
 | Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — for the launcher only; the game itself needs nothing extra |
@@ -111,7 +115,7 @@ In game:
 | `F12` | Move the PIP box to the next player, for ten seconds |
 | `Space` | Jump, when enabled in the launcher |
 
-<img src="docs/scoreboard.png" alt="The co-op scoreboard ranked by kills, with the PIP box visible" width="720">
+<sub>(The scoreboard screenshot lives on <code>main</code>: it was taken on Windows, and this branch keeps only pictures made on Linux.)</sub>
 
 ## Configuration
 
@@ -187,6 +191,11 @@ against 0.0% with `-copilot 0`.
 
 One thing to watch: `cmake_minimum_required (VERSION 2.6)` is only a warning under CMake 3.x
 but an **error under CMake 4**, which newer distributions ship.
+
+**Your Windows settings do not come along.** The Linux build starts from a fresh profile in
+its own `user/` directory, so the engine boots with `keys.csc not found, using defaults` and
+none of the launcher's bindings exist there — no `F` for the scoreboard, no `Backspace` for
+`bot_unstick`. Bind them by hand for now; wiring that up is part of step 2.
 
 The launcher is Windows-only for now: WinForms does not run on Linux.
 
@@ -285,13 +294,15 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
   para configurar.
 - **Não destrutivo** — instala *ao lado* do seu `AutoDoom.exe`, nunca por cima.
 
-<img src="docs/launcher-pt.png" alt="A janela do AutoDoom Launcher" width="520">
+> **Nesta branch nao ha captura do launcher.** Ele e WinForms, que nao roda no Linux, entao
+> nada aqui poderia mostra-lo com honestidade. Porta-lo e a etapa 2; veja
+> [Compilando → No Linux](#no-linux) para o que ja funciona.
 
 ## Requisitos
 
 | | |
 | --- | --- |
-| Sistema | Windows 10 ou 11 |
+| Sistema | Windows 10/11, **ou Linux** — a engine compila e roda; o launcher ainda nao |
 | Jogo | Uma instalação do [AutoDoom](https://github.com/ioan-chera/AutoDoom), com `AutoDoom.exe` e as DLLs do SDL2 |
 | IWAD | Qualquer IWAD de Doom, Doom II, Final Doom, Heretic ou Freedoom |
 | Runtime | [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) — só para o launcher; o jogo não precisa de nada |
@@ -389,6 +400,11 @@ dos pixels mudando em cinco segundos com `-copilot 1`, contra **0,0%** com `-cop
 
 Um cuidado: o `cmake_minimum_required (VERSION 2.6)` é só um aviso no CMake 3.x, mas vira
 **erro no CMake 4**, que as distribuições novas já trazem.
+
+**A sua configuração do Windows não vai junto.** O build Linux começa de um perfil zerado, no
+`user/` dele, então a engine sobe com `keys.csc not found, using defaults` e nenhum dos binds
+que o launcher escreve existe lá — nem o `F` do placar, nem o `Backspace` do `bot_unstick`.
+Por enquanto é amarrar na mão; automatizar isso faz parte da etapa 2.
 
 O launcher, por enquanto, é só Windows: WinForms não roda no Linux.
 
