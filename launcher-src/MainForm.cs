@@ -2039,6 +2039,7 @@ internal sealed class MainForm : Form
       // o jogo fechado, e o unico momento em que a mudanca sobrevive. O placar
       // deixou de ser opcao e vai sempre ligado.
       GameConfig.SetJump(_gameDir, _cbJump.Checked);
+      GameConfig.EnsureUnstickBind(_gameDir);
       GameConfig.SetPipFollow(_gameDir, Math.Max(_cbFollow.SelectedIndex, 0));
       GameConfig.SetFriendlyFire(_gameDir, _cbFriendly.Checked);
       GameConfig.SetScoreboard(_gameDir, true);

@@ -101,6 +101,15 @@ foreach ($dir in $userDirs) {
         }
     }
 
+        # Backspace solta os bots que travaram; a tecla so e usada no console.
+        $hasUnstick = @($bind | Where-Object { $_ -match 'bot_unstick' }).Count -gt 0
+        if (-not $hasUnstick) {
+            if ($PSCmdlet.ShouldProcess($keys, 'destravar bots no Backspace')) {
+                Add-Content -LiteralPath $keys -Value 'bind backspace "bot_unstick"' -Encoding utf8
+                Write-Step "destravar no Backspace: $($dir.Name)"
+            }
+        }
+
     if (-not (Test-Path -LiteralPath $cfg)) { continue }
 
     $lines = Get-Content -LiteralPath $cfg

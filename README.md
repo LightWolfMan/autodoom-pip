@@ -100,6 +100,7 @@ In game:
 | --- | --- |
 | `F` (hold) | Kill scoreboard |
 | `Y` | Answer yes when a bot asks to take the exit |
+| `Backspace` | Shove every bot loose when one gets stuck |
 | `F12` | Move the PIP box to the next player, for ten seconds |
 | `Space` | Jump, when enabled in the launcher |
 
@@ -288,6 +289,7 @@ No jogo:
 | --- | --- |
 | `F` (segurando) | Placar de abates |
 | `Y` | Responde sim quando um bot pede para sair |
+| `Backspace` | Destrava os bots, empurrando todos para trás |
 | `F12` | Passa o quadrinho para o próximo jogador, por dez segundos |
 | `Espaço` | Pular, quando ligado no launcher |
 

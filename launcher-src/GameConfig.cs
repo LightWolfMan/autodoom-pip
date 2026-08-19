@@ -77,6 +77,18 @@ internal static class GameConfig
       }
    }
 
+   // ------------------------------------------------------ destravar bot
+
+   /// <summary>
+   /// Backspace solta os bots que travaram. A tecla so estava ocupada no
+   /// console, entao no jogo ela fica livre para isto.
+   /// </summary>
+   public static void EnsureUnstickBind(string gameDir)
+   {
+      foreach (string profile in Profiles(gameDir))
+         AddBind(Path.Combine(profile, "keys.csc"), "bind backspace \"bot_unstick\"");
+   }
+
    // -------------------------------------------------------- fogo amigo
 
    /// <summary>Jogadores se ferem no coop? Ligado e o comportamento classico.</summary>
@@ -161,6 +173,25 @@ internal static class GameConfig
          }
 
          File.WriteAllLines(cfg, found ? lines : [.. lines, $"{key,-29} {value}"]);
+      }
+      catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+      {
+      }
+   }
+
+   private static void AddBind(string keys, string line)
+   {
+      try
+      {
+         if (!File.Exists(keys))
+            return;
+
+         List<string> lines = [.. File.ReadAllLines(keys)];
+         if (lines.Any(l => l.StartsWith(line, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+         lines.Add(line);
+         File.WriteAllLines(keys, lines);
       }
       catch (Exception e) when (e is IOException or UnauthorizedAccessException)
       {
