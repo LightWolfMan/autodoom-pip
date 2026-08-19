@@ -122,6 +122,18 @@ The script clones AutoDoom, populates the `adlmidi` submodule, applies the patch
 Nothing is installed system-wide and nothing of yours is overwritten: the binary stays in the
 build tree until you decide where to put it.
 
+Then the launcher, which needs GTK and nothing more:
+
+```
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1   # Debian/Ubuntu
+sudo pacman -S --needed python-gobject gtk4 libadwaita                     # Arch
+
+./autodoom-pip/linux-launcher/autodoom-launcher ~/AutoDoom
+```
+
+The argument is the folder holding the game; without it the launcher looks in the current
+directory, then `~/AutoDoom`, then `~/.local/share/autodoom`.
+
 ## Usage
 
 Open the launcher, pick an IWAD, set the two switches below and press **Play**.
@@ -283,7 +295,7 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
 - [Compilando](#compilando)
 - [Como funciona](#como-funciona)
 - [Limitações conhecidas](#limitações-conhecidas)
-- [Licença](#licença-1)
+- [Licença](#licença)
 
 ## Recursos
 
@@ -369,6 +381,18 @@ git clone https://github.com/LightWolfMan/autodoom-pip.git -b linux
 O script clona o AutoDoom, popula o submódulo `adlmidi`, aplica o patch e compila. Nada é
 instalado no sistema e nada seu é sobrescrito: o binário fica na árvore de build até você
 decidir onde colocá-lo.
+
+Depois o launcher, que precisa do GTK e nada além:
+
+```
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1   # Debian/Ubuntu
+sudo pacman -S --needed python-gobject gtk4 libadwaita                     # Arch
+
+./autodoom-pip/linux-launcher/autodoom-launcher ~/AutoDoom
+```
+
+O argumento é a pasta onde o jogo está; sem ele o launcher procura no diretório atual, depois
+em `~/AutoDoom` e em `~/.local/share/autodoom`.
 
 ## Como usar
 
