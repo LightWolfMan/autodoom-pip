@@ -42,10 +42,10 @@ index cfefd513..1d736dbe 100644
      else if(doorss)
 diff --git a/source/autodoom/b_vote.cpp b/source/autodoom/b_vote.cpp
 new file mode 100644
-index 00000000..0802d4b5
+index 00000000..bd7a69ef
 --- /dev/null
 +++ b/source/autodoom/b_vote.cpp
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,239 @@
 +// Emacs style mode select   -*- C++ -*-
 +//-----------------------------------------------------------------------------
 +//
@@ -113,6 +113,9 @@ index 00000000..0802d4b5
 +   va_end(args);
 +   fclose(f);
 +}
++
++// Fogo amigo entre jogadores no coop. Ligado = comportamento classico do Doom.
++int bot_friendlyfire = 1;
 +
 +int bot_exitvote       = 1;    // liga o pedido de autorizacao
 +int bot_exitvote_delay = 60;   // segundos de espera depois de um "nao"
@@ -262,6 +265,9 @@ index 00000000..0802d4b5
 +VARIABLE_BOOLEAN(bot_exitvote_log, nullptr, onoff);
 +CONSOLE_VARIABLE(bot_exitvote_log, bot_exitvote_log, 0) {}
 +
++VARIABLE_BOOLEAN(bot_friendlyfire, nullptr, onoff);
++CONSOLE_VARIABLE(bot_friendlyfire, bot_friendlyfire, 0) {}
++
 +VARIABLE_BOOLEAN(bot_exitvote, nullptr, onoff);
 +CONSOLE_VARIABLE(bot_exitvote, bot_exitvote, 0) {}
 +
@@ -281,10 +287,10 @@ index 00000000..0802d4b5
 +// EOF
 diff --git a/source/autodoom/b_vote.h b/source/autodoom/b_vote.h
 new file mode 100644
-index 00000000..da111f83
+index 00000000..2bb2c7c2
 --- /dev/null
 +++ b/source/autodoom/b_vote.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +// Emacs style mode select   -*- C++ -*-
 +//-----------------------------------------------------------------------------
 +//
@@ -313,6 +319,9 @@ index 00000000..da111f83
 +#define B_VOTE_H__
 +
 +// Liga o sistema. Com 0, os bots saem quando quiserem, como antes.
++// 1 = jogadores se ferem no coop, como no Doom classico.
++extern int bot_friendlyfire;
++
 +extern int bot_exitvote;
 +
 +// Segundos de espera depois de uma votacao recusada.
@@ -347,13 +356,15 @@ index 00000000..da111f83
 +
 +// EOF
 diff --git a/source/d_main.cpp b/source/d_main.cpp
-index 1a6e8939..d5697d87 100644
+index 1a6e8939..2d2b4694 100644
 --- a/source/d_main.cpp
 +++ b/source/d_main.cpp
-@@ -79,6 +79,11 @@
+@@ -79,6 +79,13 @@
  #include "p_setup.h"
  #include "r_draw.h"
  #include "r_main.h"
++#include "e_weapons.h"
++#include "e_inventory.h"
 +#include "r_state.h"
 +#include "m_vector.h"
 +#include "p_maputl.h"
@@ -362,7 +373,7 @@ index 1a6e8939..d5697d87 100644
  #include "r_patch.h"
  #include "s_sound.h"
  #include "st_stuff.h"
-@@ -577,6 +582,66 @@ void D_DrawWings()
+@@ -577,6 +584,187 @@ void D_DrawWings()
  // Desenha o quadrinho com a visao de outro jogador. Chamado depois da view
  // principal e antes do HUD, que fica por cima de proposito.
  //
@@ -426,10 +437,131 @@ index 1a6e8939..d5697d87 100644
 +   return cachedFound;
 +}
 +
++//
++// Moldura do quadrinho, na cor do jogador que aparece nele, mais um micro HUD
++// com vida, colete e municao.
++//
++// A cor NAO pode ser uma tabelinha chutada por indice: o primeiro tento pintava
++// de vermelho um bot que estava bege. Ela sai da mesma `translationtables` que
++// recolore o sprite do jogador -- traduzindo um indice da rampa verde original,
++// a moldura fica exatamente na cor que se ve andando na tela.
++//
++// Levar dano pisca a moldura de branco, acompanhando `damagecount`, que e o
++// contador do clarao vermelho de quem apanha.
++//
++// Espessura da moldura, acompanhando a resolucao com piso alto o bastante para
++// nao sumir numa tela grande.
++static int D_pipThickness()
++{
++   int t = video.width / 320;
++   if(t < 5)
++      t = 5;
++   if(t > 12)
++      t = 12;
++   return t;
++}
++
++static void D_drawPipFrame(const player_t &player, int x, int y, int w, int h)
++{
++   // Indice no meio da rampa verde do jogador; a traducao leva para a cor dele.
++   static const byte greenRampSample = 0x77;
++
++   byte color = greenRampSample;
++   if(player.colormap > 0 && translationtables)
++      color = translationtables[player.colormap - 1][greenRampSample];
++
++   if(player.damagecount > 0)
++      color = GameModeInfo->whiteIndex;
++
++   const int t = D_pipThickness();
++
++   V_ColorBlock(&vbscreen, color, x - t, y - t, w + 2 * t, t);
++   V_ColorBlock(&vbscreen, color, x - t, y + h, w + 2 * t, t);
++   V_ColorBlock(&vbscreen, color, x - t, y,     t, h);
++   V_ColorBlock(&vbscreen, color, x + w, y,     t, h);
++}
++
++//
++// Micro HUD dentro do quadrinho: vida, colete e municao da arma na mao.
++//
++// Escrito direto no buffer de tela, em pixels reais -- a fonte do HUD tem 8
++// pixels de altura, entao numa tela grande fica pequena, que e exatamente o que
++// se quer de um canto de tela.
++//
++static void D_drawPipHud(const player_t &player, int x, int y, int w, int h)
++{
++   extern vfont_t *hud_font;   // vive em hu_stuff.cpp, sem header proprio
++
++   if(!hud_font || !player.mo)
++      return;
++
++   int ammo = -1;
++   if(player.readyweapon && player.readyweapon->ammo)
++      ammo = E_GetItemOwnedAmount(&player, player.readyweapon->ammo);
++
++   // So vida e municao: e legenda de canto, nao painel. O colete saiu porque
++   // era o dado que menos muda o que se ve acontecendo na tela do bot.
++   qstring text;
++   text << player.health << " HP";
++   if(ammo >= 0)
++      text << "   " << ammo << " AMMO";
++
++   // A cor do texto acompanha a do jogador, igual a moldura: com dois ou tres
++   // quadrinhos na tela, a legenda pertence visualmente ao quadro certo.
++   // Doom tem quatro cores de jogador, na ordem dos slots.
++   // Pelo `colormap`, a mesma fonte de verdade da moldura -- e nao pelo numero
++   // do slot, que nao diz nada sobre a cor com que o jogador aparece.
++   static const int playerTextColor[] = { CR_GREEN, CR_GRAY, CR_BROWN, CR_RED };
++   const int shade = player.colormap >= 0 && player.colormap < 4 ? player.colormap : 0;
++   const int color = playerTextColor[shade];
++
++   // Fonte do console: mais estreita que a do HUD, que e o que se quer numa
++   // legenda de canto.
++   extern vfont_t *c_font;
++   vfont_t *font = c_font ? c_font : hud_font;
++
++   // O `vbscreen` trabalha em coordenadas de 320x200 e escala sozinho -- passar
++   // pixel real fazia o texto cair fora da tela. E o `subscreen43` nao serve:
++   // ele cobre so a area 4:3 do meio, entao um quadrinho encostado na borda
++   // esquerda cai na tarja lateral e o texto sai cortado.
++   const int t   = D_pipThickness();
++   const int gap = t + 2;
++
++   // Embaixo do quadro, fora da imagem. Se nao couber (fila de baixo), sobe
++   // para cima do quadro em vez de sumir na borda da tela.
++   const int belowPhys = y + h + gap;
++   const int textPhys  = belowPhys + 12 < video.height ? belowPhys
++                                                       : y - gap - 12;
++
++   // Meio termo de tamanho: em 320x200 a fonte sai gigante numa tela grande, e
++   // em pixel nativo sai minuscula. Uma tela virtual de 640x400 deixa a fonte na
++   // metade do tamanho original -- e o buffer e criado uma vez so, apontando
++   // para os mesmos pixels, porque trocar a escala do vbscreen a cada quadro
++   // alocaria tabelas de escala sem parar.
++   static VBuffer halfScale;
++   static int     builtFor;
++
++   if(builtFor != video.width * 100000 + video.height)
++   {
++      if(builtFor)
++         V_FreeVBuffer(&halfScale);
++
++      V_InitVBufferFrom(&halfScale, video.width, video.height, video.pitch,
++                        video.bitdepth, video.screens[0]);
++      V_SetScaling(&halfScale, SCREENWIDTH * 2, SCREENHEIGHT * 2);
++      builtFor = video.width * 100000 + video.height;
++   }
++
++   const int tx = x * (SCREENWIDTH  * 2) / video.width;
++   const int ty = textPhys * (SCREENHEIGHT * 2) / video.height;
++
++   V_FontWriteTextColored(font, text.constPtr(), color, tx, ty, &halfScale);
++}
++
  static void D_drawPipView()
  {
     if(!pip_active || gamestate != GS_LEVEL || automapactive)
-@@ -596,11 +661,25 @@ static void D_drawPipView()
+@@ -596,11 +784,25 @@ static void D_drawPipView()
     if(!count)
        return;
  
@@ -456,6 +588,21 @@ index 1a6e8939..d5697d87 100644
           {
              const int swap = order[a];
              order[a] = order[b];
+@@ -650,12 +852,9 @@ static void D_drawPipView()
+    {
+       const int x = margin + n * (w + margin);   // sempre da esquerda para a direita
+ 
+-      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, w + 2, 1);
+-      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y + h,  w + 2, 1);
+-      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x - 1, y - 1, 1, h + 2);
+-      V_ColorBlock(&vbscreen, GameModeInfo->blackIndex, x + w,  y - 1, 1, h + 2);
+-
+       R_RenderPipView(&players[order[n]], x, y, w, h);
++      D_drawPipFrame(players[order[n]], x, y, w, h);
++      D_drawPipHud(players[order[n]], x, y, w, h);
+    }
+ }
+ 
 diff --git a/source/g_game.cpp b/source/g_game.cpp
 index 320fcbc7..63f8974b 100644
 --- a/source/g_game.cpp
@@ -529,7 +676,7 @@ index 27eebb8e..5e66f9e7 100644
              temp = sortedplayers[i];
              sortedplayers[i] = sortedplayers[i+1];
 diff --git a/source/m_misc.cpp b/source/m_misc.cpp
-index 220ef4de..9c331614 100644
+index 220ef4de..57a399d0 100644
 --- a/source/m_misc.cpp
 +++ b/source/m_misc.cpp
 @@ -61,6 +61,7 @@
@@ -540,7 +687,7 @@ index 220ef4de..9c331614 100644
  #include "r_sky.h"
  #include "r_things.h"
  #include "s_sound.h"
-@@ -476,6 +477,16 @@ default_t defaults[] =
+@@ -476,6 +477,19 @@ default_t defaults[] =
     DEFAULT_INT("pip_count", &pip_count, nullptr, 1, 1, 3, default_t::wad_no,
                 "How many PIP boxes to show, left to right"),
  
@@ -549,7 +696,10 @@ index 220ef4de..9c331614 100644
 +
 +   // Votacao de saida
 +   DEFAULT_INT("bot_exitvote", &bot_exitvote, nullptr, 1, 0, 1, default_t::wad_no,
-+               "1 to make bots vote before taking the exit"),
++               "1 to make bots ask before taking the exit"),
++
++   DEFAULT_INT("bot_friendlyfire", &bot_friendlyfire, nullptr, 1, 0, 1, default_t::wad_no,
++               "1 to let players hurt each other in co-op"),
 +
 +   DEFAULT_INT("bot_exitvote_delay", &bot_exitvote_delay, nullptr, 60, 5, 600, default_t::wad_no,
 +               "Seconds to wait after a refused exit vote"),
@@ -557,6 +707,35 @@ index 220ef4de..9c331614 100644
     // For key bindings, the values stored in the key_* variables       // phares
     // are the internal Doom Codes. The values stored in the default.cfg
     // file are the keyboard codes. I_ScanCode2DoomCode converts from
+diff --git a/source/p_inter.cpp b/source/p_inter.cpp
+index dd351197..b0c015ed 100644
+--- a/source/p_inter.cpp
++++ b/source/p_inter.cpp
+@@ -60,6 +60,7 @@
+ #include "m_random.h"
+ #include "metaapi.h"
+ #include "p_inter.h"
++#include "autodoom/b_vote.h"
+ #include "p_map.h"
+ #include "p_maputl.h"
+ #include "p_portalcross.h"
+@@ -1365,6 +1366,16 @@ void P_DamageMobj(Mobj *target, Mobj *inflictor, Mobj *source,
+    if(target->health <= 0)
+       return;
+ 
++   // Fogo amigo: no coop o Doom deixa um jogador ferir o outro. Com
++   // bot_friendlyfire desligado, dano entre jogadores simplesmente nao acontece
++   // -- e o unico caso; monstro continua machucando todo mundo, e telefrag
++   // segue matando, senao alguem ficaria preso dentro de outro.
++   if(!bot_friendlyfire && GameType == gt_coop && mod != MOD_TELEFRAG &&
++      target->player && source && source->player && source != target)
++   {
++      return;
++   }
++
+    // haleyjd:
+    // Invulnerability -- telestomp can still kill to avoid getting stuck
+    // Dormancy -- things are invulnerable until they are awakened
 diff --git a/source/p_setup.cpp b/source/p_setup.cpp
 index b6027152..dbfcba44 100644
 --- a/source/p_setup.cpp

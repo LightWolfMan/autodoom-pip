@@ -77,6 +77,26 @@ internal static class GameConfig
       }
    }
 
+   // -------------------------------------------------------- fogo amigo
+
+   /// <summary>Jogadores se ferem no coop? Ligado e o comportamento classico.</summary>
+   public static bool FriendlyFire(string gameDir)
+   {
+      foreach (string profile in Profiles(gameDir))
+      {
+         string? value = ReadValue(Path.Combine(profile, "eternity.cfg"), "bot_friendlyfire");
+         if (value is not null)
+            return value != "0";
+      }
+      return true;
+   }
+
+   public static void SetFriendlyFire(string gameDir, bool enabled)
+   {
+      foreach (string profile in Profiles(gameDir))
+         WriteValue(Path.Combine(profile, "eternity.cfg"), "bot_friendlyfire", enabled ? "1" : "0");
+   }
+
    // ------------------------------------------------------- camera do PIP
 
    /// <summary>0 = segue quem mais mata, 1 = segue quem esta mais perto da saida.</summary>

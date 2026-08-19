@@ -22,7 +22,7 @@ internal sealed class MainForm : Form
    private readonly Button      _btnPlay   = new();
    private readonly Button      _btnDetect = new();
    private readonly TrackBar    _tbBots     = new();
-   private readonly Label       _lblBotCount = new();
+   private readonly NumericUpDown _nudBots  = new();
    private readonly Label       _lblStatus = new();
    private readonly ToolTip     _tips      = new();
    private readonly Label       _lblBotHint = new();
@@ -30,10 +30,27 @@ internal sealed class MainForm : Form
    private readonly CheckBox    _cbPip     = new();
    private readonly CheckBox    _cbWeapons = new();
    private readonly CheckBox    _cbJump    = new();
-   private readonly CheckBox    _cbScores  = new();
+   private readonly CheckBox    _cbFriendly = new();
    private readonly ComboBox    _cbFollow  = new();
    private readonly Label       _lblFollow = new();
    private readonly GroupBox    _grpProgress = new();
+
+   // Painel de detalhes do IWAD selecionado.
+   private readonly PictureBox  _detIcon = new();
+   private readonly Label       _detName = new();
+   private readonly Label       _detFile = new();
+   private readonly Label       _detKind = new();
+   private readonly Label       _detSize = new();
+   private readonly Label       _detMaps = new();
+
+   /// <summary>Os quatro numeros sob o slider; o corrente vai em azul negrito.</summary>
+   private readonly Label[]     _botTicks = new Label[MaxBots];
+
+   /// <summary>Slider e spinner mostram o mesmo valor; a trava evita o pingue-pongue.</summary>
+   private bool _syncingBots;
+
+   /// <summary>Inspect le o arquivo inteiro: uma vez por IWAD basta.</summary>
+   private readonly Dictionary<string, int> _mapCounts = new(StringComparer.OrdinalIgnoreCase);
    private readonly TableLayoutPanel _progressRows = new();
    private readonly Dictionary<string, (ProgressBar Bar, Label Info)> _volumeRows = new(StringComparer.OrdinalIgnoreCase);
 
@@ -63,7 +80,22 @@ internal sealed class MainForm : Form
    private Bitmap? _icoScan;
    private Bitmap? _icoExit;
    private Bitmap? _icoPlay;
+   private Bitmap? _icoPlayWhite;
+   private Bitmap? _icoOne;
+   private Bitmap? _icoTwo;
+   private Bitmap? _icoPip;
+   private Bitmap? _icoWeapon;
+   private Bitmap? _icoCamera;
+   private Bitmap? _icoJump;
+   private Bitmap? _icoFire;
+   private Bitmap? _icoWad;
    private Font?   _boldFont;
+   private Font?   _sectionFont;
+   private Font?   _titleFont;
+   private Font?   _smallFont;
+   private Font?   _nameFont;
+   private Font?   _modeNameFont;
+   private Font?   _modeDescFont;
 
    /// <summary>
    /// Um so lugar decide tamanho, icone e folga de qualquer botao da janela.
@@ -114,6 +146,14 @@ internal sealed class MainForm : Form
    private static Color InfoBorderColor =>
       IsDarkTheme ? Color.FromArgb(92, 132, 184) : Color.FromArgb(178, 209, 240);
 
+   /// <summary>Fundo dos cartoes: branco no tema claro, o proprio fundo de janela.</summary>
+   private static Color CardColor => SystemColors.Window;
+
+   /// <summary>Fundo da pagina, um degrau abaixo do cartao para o cartao aparecer.</summary>
+   private static Color PageColor => Blend(SystemColors.Window, SystemColors.ControlText, 0.04f);
+
+   private static Color CardBorderColor => Blend(SystemColors.Window, SystemColors.ControlText, 0.17f);
+
    private static Color SeparatorColor =>
       Blend(SystemColors.Control, SystemColors.ControlDark, 0.65f);
 
@@ -139,6 +179,18 @@ internal sealed class MainForm : Form
          draw(g);
       }
       return bmp;
+   }
+
+   /// <summary>Bonequinho de cabeca e ombros, no quadro logico de 16x16.</summary>
+   private static void DrawPerson(Graphics g, float cx, float top, Color color)
+   {
+      using var brush = new SolidBrush(color);
+      g.FillEllipse(brush, cx - 2.3f, top + 2f, 4.6f, 4.6f);
+      g.FillPolygon(brush, new[]
+      {
+         new PointF(cx - 4.4f, top + 14f), new PointF(cx - 3.6f, top + 8.6f),
+         new PointF(cx + 3.6f, top + 8.6f), new PointF(cx + 4.4f, top + 14f),
+      });
    }
 
    private void BuildIcons()
@@ -219,6 +271,90 @@ internal sealed class MainForm : Form
             new PointF(3.4f, 2f), new PointF(14f, 8f), new PointF(3.4f, 14f),
          });
       });
+
+      // O "Jogar" virou botao primario azul: um triangulo verde sumiria nele.
+      _icoPlayWhite = MakeIcon(size, g =>
+      {
+         using var white = new SolidBrush(Color.White);
+         g.FillPolygon(white, new[]
+         {
+            new PointF(3.4f, 2f), new PointF(14f, 8f), new PointF(3.4f, 14f),
+         });
+      });
+
+      int big = LogicalToDeviceUnits(28);
+      int card = LogicalToDeviceUnits(38);
+      _icoOne = MakeIcon(big, g => DrawPerson(g, 8f, 1f, AccentColor));
+      _icoTwo = MakeIcon(big, g =>
+      {
+         DrawPerson(g, 11.5f, 0.85f, Blend(AccentColor, SystemColors.Window, 0.45f));
+         DrawPerson(g, 5.5f,  0.95f, AccentColor);
+      });
+
+      _icoPip = MakeIcon(card, g =>
+      {
+         using var pen = new Pen(stroke, 1.2f);
+         g.DrawRectangle(pen, 1.5f, 3f, 13f, 10f);
+         using var inner = new SolidBrush(AccentColor);
+         g.FillRectangle(inner, 8.5f, 7.5f, 5f, 5f);
+      });
+
+      _icoWeapon = MakeIcon(card, g =>
+      {
+         using var body = new SolidBrush(Blend(stroke, SystemColors.Window, 0.25f));
+         g.FillRectangle(body, 2f, 6.5f, 9f, 2.6f);
+         g.FillRectangle(body, 4.5f, 9.1f, 2.4f, 4f);
+         using var barrel = new SolidBrush(AccentColor);
+         g.FillRectangle(barrel, 11f, 7f, 3.5f, 1.6f);
+      });
+
+      _icoCamera = MakeIcon(card, g =>
+      {
+         using var body = new SolidBrush(Blend(stroke, SystemColors.Window, 0.2f));
+         g.FillRectangle(body, 1.5f, 5f, 9.5f, 7f);
+         g.FillPolygon(body, new[]
+         {
+            new PointF(11.5f, 7.5f), new PointF(14.5f, 5.5f),
+            new PointF(14.5f, 11.5f), new PointF(11.5f, 9.5f),
+         });
+         using var lens = new SolidBrush(AccentColor);
+         g.FillEllipse(lens, 4.4f, 7f, 3.4f, 3.4f);
+      });
+
+      _icoJump = MakeIcon(card, g =>
+      {
+         DrawPerson(g, 8f, -1.4f, AccentColor);
+         using var ground = new Pen(Blend(stroke, SystemColors.Window, 0.4f), 1.4f);
+         g.DrawLine(ground, 2.5f, 14.2f, 13.5f, 14.2f);
+      });
+
+      _icoFire = MakeIcon(card, g =>
+      {
+         using var flame = new SolidBrush(Color.FromArgb(214, 96, 40));
+         g.FillPolygon(flame, new[]
+         {
+            new PointF(8f, 1.5f), new PointF(12.2f, 6.5f), new PointF(13f, 10.5f),
+            new PointF(10.6f, 14.2f), new PointF(5.4f, 14.2f), new PointF(3f, 10.5f),
+            new PointF(4.2f, 6f),
+         });
+         using var core = new SolidBrush(Color.FromArgb(248, 196, 64));
+         g.FillPolygon(core, new[]
+         {
+            new PointF(8f, 6.5f), new PointF(10.4f, 10.2f),
+            new PointF(8f, 13.6f), new PointF(5.6f, 10.2f),
+         });
+      });
+
+      // Reserva para o IWAD que nao entrega logo: um cartucho generico.
+      _icoWad = MakeIcon(LogicalToDeviceUnits(24), g =>
+      {
+         using var body = new SolidBrush(Blend(AccentColor, SystemColors.Window, 0.55f));
+         g.FillRectangle(body, 2f, 2.5f, 12f, 11f);
+         using var edge = new Pen(AccentColor, 1f);
+         g.DrawRectangle(edge, 2f, 2.5f, 12f, 11f);
+         using var label = new SolidBrush(SystemColors.Window);
+         g.FillRectangle(label, 4f, 4.5f, 8f, 4f);
+      });
    }
 
    protected override void Dispose(bool disposing)
@@ -229,7 +365,22 @@ internal sealed class MainForm : Form
          _icoScan?.Dispose();
          _icoExit?.Dispose();
          _icoPlay?.Dispose();
+         _icoPlayWhite?.Dispose();
+         _icoOne?.Dispose();
+         _icoTwo?.Dispose();
+         _icoPip?.Dispose();
+         _icoWeapon?.Dispose();
+         _icoCamera?.Dispose();
+         _icoJump?.Dispose();
+         _icoFire?.Dispose();
+         _icoWad?.Dispose();
          _boldFont?.Dispose();
+         _sectionFont?.Dispose();
+         _titleFont?.Dispose();
+         _smallFont?.Dispose();
+         _nameFont?.Dispose();
+         _modeNameFont?.Dispose();
+         _modeDescFont?.Dispose();
       }
       base.Dispose(disposing);
    }
@@ -271,7 +422,7 @@ internal sealed class MainForm : Form
 
    private void BuildUi()
    {
-      Text          = Strings.AppTitle;
+      Text = Strings.AppTitle;
       Font = SystemFonts.MessageBoxFont ?? Font;
       // Base de escala do Segoe UI 9pt a 100%. Sem isso o WinForms encolhe a janela.
       AutoScaleDimensions = new SizeF(7F, 15F);
@@ -279,27 +430,37 @@ internal sealed class MainForm : Form
       StartPosition = FormStartPosition.CenterScreen;
       Icon          = TryGetOwnIcon();
       AllowDrop     = true;
+      BackColor     = PageColor;
       DragEnter    += OnDragEnter;
       DragDrop     += OnDragDrop;
+
+      _sectionFont = new Font(Font.FontFamily, Font.Size * 0.86f, FontStyle.Bold);
+      _titleFont   = new Font(Font, FontStyle.Bold);
+      _boldFont    = new Font(Font, FontStyle.Bold);
+      _smallFont   = new Font(Font.FontFamily, Font.Size * 0.88f, FontStyle.Regular);
+      _nameFont    = new Font(Font.FontFamily, Font.Size * 1.15f, FontStyle.Bold);
+      // A secao Modo e a mais larga e a mais vazia: corpo maior no nome e na
+      // descricao para o texto ocupar o cartao em vez de boiar no meio dele.
+      _modeNameFont = new Font(Font.FontFamily, Font.Size * 1.30f, FontStyle.Bold);
+      _modeDescFont = new Font(Font.FontFamily, Font.Size * 1.20f, FontStyle.Regular);
 
       BuildIcons();
 
       var root = new TableLayoutPanel
       {
          Dock        = DockStyle.Fill,
-         Padding     = new Padding(16),
+         Padding     = new Padding(LogicalToDeviceUnits(14)),
          ColumnCount = 1,
-         RowCount    = 4,
+         RowCount    = 6,
+         BackColor   = PageColor,
       };
       root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // Modo
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));   // Extras
-      root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f)); // IWAD, elastica
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      root.RowCount = 6;
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // Modo
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // Extras
+      root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));  // IWAD, elastica
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // PWAD
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // progresso
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // rodape
 
       root.Controls.Add(BuildModeGroup(),     0, 0);
       root.Controls.Add(BuildExtrasGroup(),   0, 1);
@@ -318,39 +479,225 @@ internal sealed class MainForm : Form
    protected override void OnLoad(EventArgs e)
    {
       base.OnLoad(e);
-      MinimumSize = new Size(LogicalToDeviceUnits(520), LogicalToDeviceUnits(560));
-      Size        = new Size(LogicalToDeviceUnits(600), LogicalToDeviceUnits(680));
+      MinimumSize = new Size(LogicalToDeviceUnits(1040), LogicalToDeviceUnits(740));
+      Size        = new Size(LogicalToDeviceUnits(1250), LogicalToDeviceUnits(880));
       CenterToScreen();
 
       RefreshDetectAvailability();
       PruneStoredPwads();
+      UpdateIwadDetails();
 
       if (_autoDetect && _btnDetect.Enabled)
          BeginInvoke(() => OnDetectWads(this, EventArgs.Empty));
    }
 
+   // ------------------------------------------------------- cartoes e secoes
+
+   /// <summary>
+   /// Cartao branco de canto arredondado. O fundo do painel fica na cor da pagina
+   /// para os cantos vazados nao virarem quadradinhos brancos; quem pinta o branco
+   /// e o Paint, dentro do caminho arredondado.
+   /// </summary>
+   private void PaintCard(object? sender, PaintEventArgs e)
+   {
+      if (sender is not Control card)
+         return;
+
+      e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+      var area = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
+      using GraphicsPath path = RoundedRect(area, LogicalToDeviceUnits(8));
+      using var fill = new SolidBrush(CardColor);
+      using var edge = new Pen(CardBorderColor);
+      e.Graphics.FillPath(fill, path);
+      e.Graphics.DrawPath(edge, path);
+   }
+
+   private TableLayoutPanel MakeCard(Control inner, int pad, bool fill)
+   {
+      inner.BackColor = CardColor;
+      inner.Dock      = DockStyle.Fill;
+      inner.Margin    = new Padding(0);
+
+      var card = new TableLayoutPanel
+      {
+         ColumnCount  = 1,
+         RowCount     = 1,
+         BackColor    = PageColor,
+         Padding      = new Padding(LogicalToDeviceUnits(pad)),
+         Margin       = new Padding(0),
+         Dock         = fill ? DockStyle.Fill : DockStyle.Top,
+         AutoSize     = !fill,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+      };
+      card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      card.RowStyles.Add(fill ? new RowStyle(SizeType.Percent, 100f) : new RowStyle(SizeType.AutoSize));
+      card.Controls.Add(inner, 0, 0);
+      card.Paint += PaintCard;
+      return card;
+   }
+
+   /// <summary>Titulo em maiusculas azuis acima do cartao branco da secao.</summary>
+   private Control MakeSection(string title, Control inner, bool fill, int pad = 14)
+   {
+      var caption = new Label
+      {
+         Text      = title.ToUpperInvariant(),
+         AutoSize  = true,
+         Font      = _sectionFont,
+         ForeColor = AccentColor,
+         BackColor = PageColor,
+         Margin    = new Padding(LogicalToDeviceUnits(4), 0, 0, LogicalToDeviceUnits(4)),
+      };
+
+      var host = new TableLayoutPanel
+      {
+         ColumnCount  = 1,
+         RowCount     = 2,
+         BackColor    = PageColor,
+         Dock         = fill ? DockStyle.Fill : DockStyle.Top,
+         AutoSize     = !fill,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Margin       = new Padding(0, 0, 0, LogicalToDeviceUnits(10)),
+      };
+      host.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      host.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      host.RowStyles.Add(fill ? new RowStyle(SizeType.Percent, 100f) : new RowStyle(SizeType.AutoSize));
+      host.Controls.Add(caption, 0, 0);
+      host.Controls.Add(MakeCard(inner, pad, fill), 0, 1);
+      return host;
+   }
+
+   private Label MakeText(string text, Font? font, Color color) => new()
+   {
+      Text      = text,
+      AutoSize  = true,
+      Font      = font ?? Font,
+      ForeColor = color,
+      Margin    = new Padding(0),
+      Anchor    = AnchorStyles.Left,
+   };
+
+   private static PictureBox MakeGlyph(Bitmap? bitmap, Padding margin) => new()
+   {
+      Image    = bitmap,
+      SizeMode = PictureBoxSizeMode.AutoSize,
+      Margin   = margin,
+      Anchor   = AnchorStyles.Left,
+   };
+
+   // ------------------------------------------------------------------ modo
+
    private Control BuildModeGroup()
    {
-      _rbCopilot.Text     = Strings.ModeCopilot;
-      _rbCopilot.AutoSize = true;
-      _rbCopilot.Anchor   = AnchorStyles.Left;
-      _rbCopilot.Margin   = new Padding(0, 0, 0, 4);
-      _rbCopilot.Checked  = true;
-      // O GroupBox pinta o titulo com a cor de acento; sem isto os filhos herdariam
-      // o azul junto.
+      _rbCopilot.Text      = "";
+      _rbCopilot.AutoSize  = true;
+      _rbCopilot.Anchor    = AnchorStyles.Left;
+      _rbCopilot.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
+      _rbCopilot.Checked   = true;
       _rbCopilot.ForeColor = SystemColors.ControlText;
 
-      _rbCoop.Text     = Strings.ModeCoop;
-      _rbCoop.AutoSize = true;
-      // Anchor.Left sozinho num TableLayoutPanel centraliza o controle na vertical
-      // da celula: e assim que radio, spinner e "bots" ficam na mesma linha de base.
-      _rbCoop.Anchor   = AnchorStyles.Left;
-      _rbCoop.Margin   = new Padding(0, 0, Gutter, 0);
+      _rbCoop.Text      = "";
+      _rbCoop.AutoSize  = true;
+      _rbCoop.Anchor    = AnchorStyles.Left;
+      _rbCoop.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
       _rbCoop.ForeColor = SystemColors.ControlText;
       _rbCoop.CheckedChanged += (_, _) => UpdateEnabledState();
 
-      // Um slider de 1 a 4 diz mais que um spinner: os quatro valores cabem na
-      // regua e o passo unico impede valor invalido sem precisar validar nada.
+      var rows = new TableLayoutPanel
+      {
+         ColumnCount  = 3,
+         RowCount     = 2,
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Margin       = new Padding(0),
+      };
+      rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      rows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      rows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+      rows.Controls.Add(_rbCopilot, 0, 0);
+      rows.Controls.Add(MakeGlyph(_icoOne, new Padding(0, 0, LogicalToDeviceUnits(10), 0)), 1, 0);
+      rows.Controls.Add(BuildModeText(Strings.ModeCopilotName, Strings.ModeCopilotDesc, _rbCopilot, null), 2, 0);
+
+      rows.Controls.Add(_rbCoop, 0, 1);
+      rows.Controls.Add(MakeGlyph(_icoTwo, new Padding(0, LogicalToDeviceUnits(12), LogicalToDeviceUnits(10), 0)), 1, 1);
+      rows.Controls.Add(BuildModeText(Strings.ModeCoopName, Strings.ModeCoopDesc, _rbCoop, BuildBotsRow()), 2, 1);
+
+      var rule = new Panel
+      {
+         Dock      = DockStyle.Fill,
+         Width     = 1,
+         BackColor = CardBorderColor,
+         Margin    = new Padding(LogicalToDeviceUnits(16), LogicalToDeviceUnits(2),
+                                 LogicalToDeviceUnits(16), LogicalToDeviceUnits(2)),
+      };
+
+      var body = new TableLayoutPanel
+      {
+         ColumnCount  = 3,
+         RowCount     = 1,
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Margin       = new Padding(0),
+      };
+      body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      body.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LogicalToDeviceUnits(330)));
+      body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      // Centrado na coluna elastica: a sobra do cartao vira folga dos dois lados
+      // em vez de uma faixa vazia so a direita. As duas linhas continuam alinhadas
+      // entre si porque quem centraliza e o bloco inteiro, nao cada linha.
+      rows.Anchor = AnchorStyles.None;
+      body.Controls.Add(rows,           0, 0);
+      body.Controls.Add(rule,           1, 0);
+      body.Controls.Add(BuildInfoBox(), 2, 0);
+
+      return MakeSection(Strings.GroupMode, body, fill: false);
+   }
+
+   /// <summary>
+   /// Rotulo em negrito, descricao normal e, no Coop, os controles de bot na mesma
+   /// linha. Clicar em qualquer parte do texto marca o radio, que fica sem texto
+   /// proprio; o mnemonico vive no rotulo e cai no radio pela ordem de tabulacao.
+   /// </summary>
+   private Control BuildModeText(string name, string description, RadioButton radio, Control? extra)
+   {
+      Label title = MakeText(name, _modeNameFont, SystemColors.ControlText);
+      title.UseMnemonic = true;
+      title.Margin      = new Padding(0, 0, LogicalToDeviceUnits(7), 0);
+
+      Label desc = MakeText(description, _modeDescFont, SystemColors.ControlText);
+      desc.Margin = new Padding(0, 0, LogicalToDeviceUnits(14), 0);
+
+      foreach (Label label in new[] { title, desc })
+         label.Click += (_, _) => radio.Checked = true;
+
+      var line = new TableLayoutPanel
+      {
+         ColumnCount  = extra is null ? 3 : 4,
+         RowCount     = 1,
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Margin       = new Padding(0, LogicalToDeviceUnits(4), 0, LogicalToDeviceUnits(4)),
+      };
+      line.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      line.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      if (extra is not null)
+         line.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      line.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      line.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      line.Controls.Add(title, 0, 0);
+      line.Controls.Add(desc,  1, 0);
+      if (extra is not null)
+         line.Controls.Add(extra, 2, 0);
+      return line;
+   }
+
+   /// <summary>Slider com a regua 1..4 embaixo, o spinner do valor e a palavra "bots".</summary>
+   private Control BuildBotsRow()
+   {
       _tbBots.Minimum       = 1;
       _tbBots.Maximum       = MaxBots;
       _tbBots.TickFrequency = 1;
@@ -358,98 +705,117 @@ internal sealed class MainForm : Form
       _tbBots.LargeChange   = 1;
       _tbBots.TickStyle     = TickStyle.BottomRight;
       _tbBots.AutoSize      = false;
-      _tbBots.Height        = LogicalToDeviceUnits(40);
-      // Left|Right sem Top|Bottom: estica na horizontal e continua centrado na
-      // vertical em relacao ao radio e ao numero.
-      _tbBots.Anchor        = AnchorStyles.Left | AnchorStyles.Right;
-      _tbBots.Margin        = new Padding(0, 0, Gutter, 0);
+      _tbBots.Dock          = DockStyle.Fill;
+      _tbBots.Margin        = new Padding(0);
       _tbBots.Value         = 3;
 
-      _boldFont = new Font(Font, FontStyle.Bold);
-
-      _lblBotCount.AutoSize  = true;
-      _lblBotCount.Anchor    = AnchorStyles.Left;
-      _lblBotCount.Margin    = new Padding(0, 0, 4, 0);
-      _lblBotCount.Font      = _boldFont;
-      _lblBotCount.ForeColor = SystemColors.ControlText;
-      _lblBotCount.Text      = _tbBots.Value.ToString();
-
-      // Ligado depois do valor inicial: o handler mexe no _lblBotCount, que precisa
-      // ja existir quando o primeiro ValueChanged disparar.
-      _tbBots.ValueChanged += (_, _) => UpdateBotHint();
-
-      var botsAfter = new Label
+      var scale = new TableLayoutPanel
       {
-         Text      = Strings.BotsWord,
-         AutoSize  = true,
-         Anchor    = AnchorStyles.Left,
-         Margin    = new Padding(0),
-         ForeColor = SystemColors.ControlText,
+         ColumnCount = MaxBots,
+         RowCount    = 1,
+         Dock        = DockStyle.Fill,
+         Margin      = new Padding(0),
+      };
+      scale.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+      for (int i = 0; i < MaxBots; i++)
+      {
+         scale.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / MaxBots));
+         _botTicks[i] = new Label
+         {
+            Text      = (i + 1).ToString(),
+            Dock      = DockStyle.Fill,
+            TextAlign = ContentAlignment.TopCenter,
+            Font      = _smallFont,
+            ForeColor = SystemColors.GrayText,
+            Margin    = new Padding(0),
+         };
+         scale.Controls.Add(_botTicks[i], i, 0);
+      }
+
+      var slider = new TableLayoutPanel
+      {
+         ColumnCount = 1,
+         RowCount    = 2,
+         Width       = LogicalToDeviceUnits(160),
+         Height      = LogicalToDeviceUnits(52),
+         Margin      = new Padding(0, 0, LogicalToDeviceUnits(10), 0),
+         Anchor      = AnchorStyles.Left,
+      };
+      slider.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      slider.RowStyles.Add(new RowStyle(SizeType.Absolute, LogicalToDeviceUnits(34)));
+      slider.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+      slider.Controls.Add(_tbBots, 0, 0);
+      slider.Controls.Add(scale,   0, 1);
+
+      _nudBots.Minimum   = 1;
+      _nudBots.Maximum   = MaxBots;
+      _nudBots.Value     = _tbBots.Value;
+      _nudBots.Width     = LogicalToDeviceUnits(56);
+      _nudBots.TextAlign = HorizontalAlignment.Center;
+      _nudBots.Anchor    = AnchorStyles.Left;
+      _nudBots.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
+
+      // Fonte unica de verdade e o slider; o spinner so espelha. A trava evita que
+      // um ValueChanged chame o outro em cascata.
+      _tbBots.ValueChanged += (_, _) =>
+      {
+         if (_syncingBots)
+            return;
+         _syncingBots = true;
+         _nudBots.Value = _tbBots.Value;
+         _syncingBots = false;
+         UpdateBotHint();
+      };
+      _nudBots.ValueChanged += (_, _) =>
+      {
+         if (_syncingBots)
+            return;
+         _syncingBots = true;
+         _tbBots.Value = (int)_nudBots.Value;
+         _syncingBots = false;
+         UpdateBotHint();
       };
 
-      // "bots" acompanha o slider: sem isso o numero fica cinza e a palavra preta
-      // no modo Copiloto.
-      _tbBots.EnabledChanged += (_, _) => botsAfter.Enabled = _tbBots.Enabled;
-
-      // Numero e palavra andam juntos e ancoram na direita, na mesma coluna de
-      // pixels da caixa de aviso e dos botoes.
-      var botsValue = new TableLayoutPanel
+      Label word = MakeText(Strings.BotsWord, _modeDescFont, SystemColors.ControlText);
+      _tbBots.EnabledChanged += (_, _) =>
       {
-         ColumnCount  = 2,
+         _nudBots.Enabled = _tbBots.Enabled;
+         word.Enabled     = _tbBots.Enabled;
+         foreach (Label tick in _botTicks)
+            tick.Enabled = _tbBots.Enabled;
+      };
+
+      var row = new TableLayoutPanel
+      {
+         ColumnCount  = 3,
          RowCount     = 1,
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Anchor       = AnchorStyles.Right,
-         Margin       = new Padding(Gutter, 0, 0, 0),
-      };
-      botsValue.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      botsValue.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      botsValue.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      botsValue.Controls.Add(_lblBotCount, 0, 0);
-      botsValue.Controls.Add(botsAfter,    1, 0);
-
-      // Dock.Top para a linha ocupar a largura toda, e o slider na coluna Percent
-      // com Anchor nos dois lados: a sobra vira regua em vez de vazio a direita.
-      // Centralizar o conjunto aqui abriria um buraco entre "voce joga com" e o
-      // slider e quebraria a frase no meio.
-      // Os DOIS radios moram aqui, no mesmo painel: no WinForms a exclusao mutua
-      // vale por container pai imediato. Com o Copiloto em outro painel, os dois
-      // ficavam marcados ao mesmo tempo e nenhum desmarcava o outro.
-      var modeRows = new TableLayoutPanel
-      {
-         Dock         = DockStyle.Top,
-         ColumnCount  = 3,
-         RowCount     = 2,
-         AutoSize     = true,
-         AutoSizeMode = AutoSizeMode.GrowAndShrink,
          Margin       = new Padding(0),
+         Anchor       = AnchorStyles.Left,
       };
-      modeRows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      modeRows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      modeRows.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      modeRows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      modeRows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      for (int i = 0; i < 3; i++)
+         row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      row.Controls.Add(slider,   0, 0);
+      row.Controls.Add(_nudBots, 1, 0);
+      row.Controls.Add(word,     2, 0);
+      return row;
+   }
 
-      modeRows.Controls.Add(_rbCopilot, 0, 0);
-      modeRows.SetColumnSpan(_rbCopilot, 3);
-      modeRows.Controls.Add(_rbCoop,   0, 1);
-      modeRows.Controls.Add(_tbBots,   1, 1);
-      modeRows.Controls.Add(botsValue, 2, 1);
+   /// <summary>Caixa azul de dica, na direita do painel de modo.</summary>
+   private Control BuildInfoBox()
+   {
+      foreach (Label label in new[] { _lblCopilotHint, _lblBotHint })
+      {
+         label.AutoSize  = true;
+         label.Dock      = DockStyle.Fill;
+         label.ForeColor = SystemColors.ControlText;
+         label.Margin    = new Padding(0);
+      }
+      _lblCopilotHint.Text = Strings.CopilotHint;
 
-      // Dock.Fill numa coluna Percent: o label recebe a largura real disponivel e
-      // quebra a linha nela, em vez de num MaximumSize fixo em pixels.
-      _lblBotHint.AutoSize  = true;
-      _lblBotHint.Dock      = DockStyle.Fill;
-      _lblBotHint.ForeColor = SystemColors.ControlText;
-      _lblBotHint.Margin    = new Padding(0, 6, 0, 0);
-
-      _lblCopilotHint.Text      = Strings.CopilotHint;
-      _lblCopilotHint.AutoSize  = true;
-      _lblCopilotHint.Dock      = DockStyle.Fill;
-      _lblCopilotHint.ForeColor = SystemColors.ControlText;
-      _lblCopilotHint.Margin    = new Padding(0);
-
-      var hintText = new TableLayoutPanel
+      var text = new TableLayoutPanel
       {
          Dock         = DockStyle.Fill,
          ColumnCount  = 1,
@@ -457,42 +823,34 @@ internal sealed class MainForm : Form
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
          Margin       = new Padding(0),
-         // Cor explicita em vez de Transparent: fundo transparente no WinForms
-         // depende do repaint do pai e piscava sobre o desenho do Paint.
          BackColor    = InfoFillColor,
       };
-      hintText.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      hintText.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      hintText.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      hintText.Controls.Add(_lblCopilotHint, 0, 0);
-      hintText.Controls.Add(_lblBotHint, 0, 1);
+      text.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      text.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      text.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      text.Controls.Add(_lblCopilotHint, 0, 0);
+      text.Controls.Add(_lblBotHint,     0, 1);
 
-      // Caixa de aviso: Dock.Top estica ate a borda direita do grupo e o AutoSize
-      // ainda encolhe a altura quando a segunda linha some. O padding da esquerda
-      // abre o espaco onde o Paint desenha o circulo do "i".
-      var infoBox = new TableLayoutPanel
+      var box = new TableLayoutPanel
       {
-         Dock         = DockStyle.Top,
+         Dock         = DockStyle.Fill,
          ColumnCount  = 1,
          RowCount     = 1,
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Padding      = new Padding(38, 10, 12, 10),
-         Margin       = new Padding(0, 12, 0, 0),
+         Padding      = new Padding(LogicalToDeviceUnits(36), LogicalToDeviceUnits(10),
+                                    LogicalToDeviceUnits(12), LogicalToDeviceUnits(10)),
+         Margin       = new Padding(0),
       };
-      infoBox.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      infoBox.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      infoBox.Controls.Add(hintText, 0, 0);
-      infoBox.Paint += OnPaintInfoBox;
+      box.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      box.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      box.Controls.Add(text, 0, 0);
+      box.Paint += OnPaintInfoBox;
 
-      // Sem um teto de largura, o GroupBox mede os labels como se coubessem numa
-      // linha so e fecha com a altura de uma linha a menos: a dica de duas linhas
-      // entao cobre a borda de baixo do grupo. Amarrar o teto na largura real faz
-      // a medida e o desenho concordarem. A guarda de igualdade evita o laco de
-      // layout que a propria mudanca de MaximumSize dispararia.
-      infoBox.SizeChanged += (_, _) =>
+      // Sem teto de largura o painel mede o texto como uma linha so e fecha curto.
+      box.SizeChanged += (_, _) =>
       {
-         int usable = infoBox.ClientSize.Width - infoBox.Padding.Horizontal;
+         int usable = box.ClientSize.Width - box.Padding.Horizontal;
          if (usable <= 0)
             return;
 
@@ -502,117 +860,150 @@ internal sealed class MainForm : Form
          if (_lblBotHint.MaximumSize != cap)
             _lblBotHint.MaximumSize = cap;
       };
-
-      // TableLayoutPanel no lugar do FlowLayoutPanel: o Flow so da a cada filho a
-      // largura natural dele, e a caixa de aviso precisa esticar ate a borda.
-      var layout = new TableLayoutPanel
-      {
-         Dock         = DockStyle.Top,
-         ColumnCount  = 1,
-         RowCount     = 2,
-         AutoSize     = true,
-         AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Padding      = new Padding(12, 10, 12, 12),
-      };
-      layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      for (int i = 0; i < 2; i++)
-         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      layout.Controls.Add(modeRows, 0, 0);
-      layout.Controls.Add(infoBox,  0, 1);
-
-      GroupBox box = MakeGroup(Strings.GroupMode);
-      box.Dock = DockStyle.Top;
-      box.Controls.Add(layout);
-      FitGroupToContent(box, layout);
       return box;
    }
 
-   /// <summary>Titulo do grupo no azul de acento, com os filhos de volta na cor normal.</summary>
-   /// <summary>Opcoes que dependem de coisas fora do launcher: o exe com PIP e o
-   /// dmflags do Coop.</summary>
+   // ---------------------------------------------------------------- extras
+
    private Control BuildExtrasGroup()
    {
-      _cbPip.Text     = Strings.PipOption;
-      _cbPip.AutoSize = true;
-      _cbPip.Margin   = new Padding(0, 0, 0, Gutter);
-      _cbPip.ForeColor = SystemColors.ControlText;
-
-      _cbWeapons.Text     = Strings.WeaponsOption;
-      _cbWeapons.AutoSize = true;
-      _cbWeapons.Margin   = new Padding(0, 0, 0, 2);
-      _cbWeapons.ForeColor = SystemColors.ControlText;
-
-      var hint = new Label
+      foreach (CheckBox check in new[] { _cbPip, _cbWeapons, _cbJump, _cbFriendly })
       {
-         Text      = Strings.WeaponsHint,
-         AutoSize  = true,
-         ForeColor = SystemColors.GrayText,
-         Margin    = new Padding(20, 0, 0, Gutter),
-      };
+         check.Text      = "";
+         check.AutoSize  = true;
+         check.Anchor    = AnchorStyles.Left;
+         check.Margin    = new Padding(0, 0, LogicalToDeviceUnits(6), 0);
+         check.ForeColor = SystemColors.ControlText;
+      }
 
-      _cbJump.Text      = Strings.JumpOption;
-      _cbJump.AutoSize  = true;
-      _cbJump.Margin    = new Padding(0, 0, 0, Gutter);
-      _cbJump.ForeColor = SystemColors.ControlText;
+      Control pip     = MakeOptionCard(_cbPip,      _icoPip,    Strings.PipOptionShort,     Strings.PipOptionHint,    null);
+      Control weapons = MakeOptionCard(_cbWeapons,  _icoWeapon, Strings.WeaponsOptionShort, Strings.WeaponsHint,      null);
+      Control camera  = MakeOptionCard(null,        _icoCamera, Strings.CameraCardTitle,    null,                     BuildFollowRow(), _lblFollow);
+      Control jump    = MakeOptionCard(_cbJump,     _icoJump,   Strings.JumpOptionShort,    Strings.JumpHint,         null);
+      Control fire    = MakeOptionCard(_cbFriendly, _icoFire,   Strings.FriendlyFireOption, Strings.FriendlyFireHint, null);
 
-      _cbScores.Text      = Strings.ScoreboardOption;
-      _cbScores.AutoSize  = true;
-      _cbScores.Margin    = new Padding(0);
-      _cbScores.ForeColor = SystemColors.ControlText;
-
-      var layout = new FlowLayoutPanel
-      {
-         Dock          = DockStyle.Top,
-         FlowDirection = FlowDirection.TopDown,
-         WrapContents  = false,
-         AutoSize      = true,
-         AutoSizeMode  = AutoSizeMode.GrowAndShrink,
-         Padding       = new Padding(12, 8, 12, 12),
-      };
-      layout.Controls.Add(_cbPip);
-      layout.Controls.Add(BuildFollowRow());
-      layout.Controls.Add(_cbWeapons);
-      layout.Controls.Add(hint);
-      layout.Controls.Add(_cbJump);
-      layout.Controls.Add(_cbScores);
-
-      GroupBox box = MakeGroup(Strings.GroupExtras);
-      box.Dock = DockStyle.Top;
-      box.Controls.Add(layout);
-      FitGroupToContent(box, layout);
-      return box;
-   }
-
-   /// <summary>Quem o quadrinho persegue. So faz sentido com o PIP ligado.</summary>
-   private Control BuildFollowRow()
-   {
-      _lblFollow.Text      = Strings.FollowLabel;
-      _lblFollow.AutoSize  = true;
-      _lblFollow.Anchor    = AnchorStyles.Left;
-      _lblFollow.ForeColor = SystemColors.ControlText;
-      _lblFollow.Margin    = new Padding(20, 0, Gutter, 0);
-
-      _cbFollow.DropDownStyle = ComboBoxStyle.DropDownList;
-      _cbFollow.Anchor        = AnchorStyles.Left;
-      _cbFollow.Width         = LogicalToDeviceUnits(230);
-      _cbFollow.Margin        = new Padding(0);
-      _cbFollow.Items.Add(Strings.FollowKills);
-      _cbFollow.Items.Add(Strings.FollowExit);
-
-      var row = new TableLayoutPanel
+      var grid = new TableLayoutPanel
       {
          ColumnCount  = 2,
+         RowCount     = 3,
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Dock         = DockStyle.Fill,
+         Margin       = new Padding(0),
+      };
+      grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+      grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+      for (int i = 0; i < 3; i++)
+         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+      grid.Controls.Add(pip,     0, 0);
+      grid.Controls.Add(weapons, 1, 0);
+      grid.Controls.Add(camera,  0, 1);
+      grid.Controls.Add(jump,    1, 1);
+      grid.Controls.Add(fire,    0, 2);
+      grid.SetColumnSpan(fire, 2);
+
+      // Sobrou uma celula: o cartao de fogo amigo fica com a largura de uma coluna
+      // e centrado nas duas, em vez de meia grade vazia.
+      fire.Anchor = AnchorStyles.None;
+      grid.SizeChanged += (_, _) =>
+      {
+         int half = grid.ClientSize.Width / 2;
+         if (half > 0 && fire.Width != half)
+            fire.Width = half;
+      };
+
+      return MakeSection(Strings.GroupExtras, grid, fill: false, pad: 8);
+   }
+
+   /// <summary>
+   /// Um cartao de opcao: caixa de marcar, icone, titulo em negrito e, embaixo, a
+   /// descricao em cinza ou um controle (o caso da camera).
+   /// </summary>
+   private Control MakeOptionCard(CheckBox? check, Bitmap? glyph, string title, string? description,
+                                  Control? control, Label? captionField = null)
+   {
+      Label caption = captionField ?? MakeText(title, _titleFont, SystemColors.ControlText);
+      caption.Text      = title;
+      caption.AutoSize  = true;
+      caption.Font      = _titleFont;
+      caption.ForeColor = SystemColors.ControlText;
+      caption.Anchor    = AnchorStyles.Left;
+      caption.Margin    = new Padding(0, 0, LogicalToDeviceUnits(10), LogicalToDeviceUnits(2));
+      if (check is not null)
+         caption.Click += (_, _) => check.Checked = !check.Checked;
+
+      var stack = new TableLayoutPanel
+      {
+         AutoSize     = true,
+         AutoSizeMode = AutoSizeMode.GrowAndShrink,
+         Dock         = DockStyle.Fill,
+         Margin       = new Padding(0),
+      };
+
+      if (control is not null)
+      {
+         // Cartao com controle (a camera): rotulo a esquerda, controle a direita.
+         stack.ColumnCount = 2;
+         stack.RowCount    = 1;
+         stack.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+         stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+         stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+         control.Margin = new Padding(0);
+         control.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+         stack.Controls.Add(caption, 0, 0);
+         stack.Controls.Add(control, 1, 0);
+      }
+      else
+      {
+         Label below = MakeText(description ?? "", _smallFont, SystemColors.GrayText);
+         below.Margin = new Padding(0);
+         stack.ColumnCount = 1;
+         stack.RowCount    = 2;
+         stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+         stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+         stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+         stack.Controls.Add(caption, 0, 0);
+         stack.Controls.Add(below,   0, 1);
+      }
+
+      var inner = new TableLayoutPanel
+      {
+         ColumnCount  = 3,
          RowCount     = 1,
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Margin       = new Padding(0, 0, 0, Gutter),
+         Margin       = new Padding(0),
       };
-      row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-      row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-      row.Controls.Add(_lblFollow, 0, 0);
-      row.Controls.Add(_cbFollow,  1, 0);
-      return row;
+      inner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      inner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      inner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+      if (check is not null)
+         inner.Controls.Add(check, 0, 0);
+
+      PictureBox icon = MakeGlyph(glyph, new Padding(0, 0, LogicalToDeviceUnits(10), 0));
+      icon.Anchor = AnchorStyles.None;   // centrado na altura do cartao
+      inner.Controls.Add(icon, 1, 0);
+      inner.Controls.Add(stack, 2, 0);
+
+      TableLayoutPanel card = MakeCard(inner, 10, fill: false);
+      card.Margin = new Padding(LogicalToDeviceUnits(4));
+      return card;
+   }
+
+   /// <summary>Quem o quadrinho persegue. So faz sentido com o PIP ligado.</summary>
+   /// <summary>
+   /// So a combo: o rotulo "A camera segue:" e o proprio titulo do cartao, e e o
+   /// mesmo _lblFollow que o UpdateEnabledState acinzenta junto com ela.
+   /// </summary>
+   private Control BuildFollowRow()
+   {
+      _cbFollow.DropDownStyle = ComboBoxStyle.DropDownList;
+      _cbFollow.Items.Add(Strings.FollowKills);
+      _cbFollow.Items.Add(Strings.FollowExit);
+      return _cbFollow;
    }
 
    private static GroupBox MakeGroup(string text) => new()
@@ -625,10 +1016,7 @@ internal sealed class MainForm : Form
 
    /// <summary>
    /// Altura do grupo tirada do conteudo, sem AutoSize. O AutoSize do GroupBox erra
-   /// a reserva da faixa do titulo e o filho acaba pintado por cima da legenda --
-   /// aconteceu tres vezes, e da ultima so no ingles, porque o texto mais curto
-   /// mudava a conta por poucos pixels. Aqui a legenda esta reservada por
-   /// construcao: content.Top ja e o topo do DisplayRectangle, abaixo do titulo.
+   /// a reserva da faixa do titulo e o filho acaba pintado por cima da legenda.
    /// </summary>
    private static void FitGroupToContent(GroupBox box, Control content)
    {
@@ -651,10 +1039,10 @@ internal sealed class MainForm : Form
    {
       int d = radius * 2;
       var path = new GraphicsPath();
-      path.AddArc(r.Left,         r.Top,            d, d, 180, 90);
-      path.AddArc(r.Right - d,    r.Top,            d, d, 270, 90);
-      path.AddArc(r.Right - d,    r.Bottom - d,     d, d,   0, 90);
-      path.AddArc(r.Left,         r.Bottom - d,     d, d,  90, 90);
+      path.AddArc(r.Left,      r.Top,        d, d, 180, 90);
+      path.AddArc(r.Right - d, r.Top,        d, d, 270, 90);
+      path.AddArc(r.Right - d, r.Bottom - d, d, d,   0, 90);
+      path.AddArc(r.Left,      r.Bottom - d, d, d,  90, 90);
       path.CloseFigure();
       return path;
    }
@@ -695,18 +1083,19 @@ internal sealed class MainForm : Form
       g.DrawString("i", glyph, ink, disc, format);
    }
 
-   /// <summary>A lista de IWADs ocupa o corpo da janela: e a escolha principal.</summary>
+   // ------------------------------------------------------------------ iwad
+
    private Control BuildIwadGroup()
    {
       _lbIwads.Dock           = DockStyle.Fill;
       _lbIwads.IntegralHeight = false;
-      _lbIwads.Margin         = new Padding(0, 0, Gutter, 0);
+      _lbIwads.BorderStyle    = BorderStyle.FixedSingle;
+      _lbIwads.Margin         = new Padding(0, 0, LogicalToDeviceUnits(12), 0);
       _lbIwads.ForeColor      = SystemColors.WindowText;
-      // Linhas altas e desenhadas a mao: no modo padrao elas ficam coladas e sem recuo.
       _lbIwads.DrawMode       = DrawMode.OwnerDrawFixed;
-      _lbIwads.ItemHeight     = LogicalToDeviceUnits(26);
+      _lbIwads.ItemHeight     = LogicalToDeviceUnits(34);
       _lbIwads.DrawItem      += OnDrawIwadItem;
-      _lbIwads.SelectedIndexChanged += (_, _) => UpdateEnabledState();
+      _lbIwads.SelectedIndexChanged += (_, _) => { UpdateEnabledState(); UpdateIwadDetails(); };
       _lbIwads.DoubleClick += (_, _) => { if (_btnPlay.Enabled) OnPlay(this, EventArgs.Empty); };
 
       var browse = StyleButton(new Button(), Strings.Browse, _icoFolder, new Padding(0, 0, 0, Gutter));
@@ -715,8 +1104,6 @@ internal sealed class MainForm : Form
       StyleButton(_btnDetect, Strings.Detect, _icoScan, new Padding(0));
       _btnDetect.Click += OnDetectWads;
 
-      // Coluna da direita ancorada no topo: os dois botoes tem a mesma largura e a
-      // mesma borda direita que o "Procurar..." do grupo PWAD logo abaixo.
       var side = new FlowLayoutPanel
       {
          FlowDirection = FlowDirection.TopDown,
@@ -724,34 +1111,90 @@ internal sealed class MainForm : Form
          AutoSize      = true,
          AutoSizeMode  = AutoSizeMode.GrowAndShrink,
          Anchor        = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-         Margin        = new Padding(0),
+         Margin        = new Padding(0, 0, LogicalToDeviceUnits(12), 0),
       };
       side.Controls.Add(browse);
       side.Controls.Add(_btnDetect);
 
-      // Coluna de botoes com largura fixa e igual a do grupo PWAD: e o que faz a
-      // borda direita da lista cair na mesma coluna de pixels da borda da combo.
-      // Medido: ColumnStyle Absolute NAO e reescalado pelo autoscale, entao o valor
-      // vai ja em unidades de tela, igual ao MinimumSize dos botoes.
       var layout = new TableLayoutPanel
       {
          Dock        = DockStyle.Fill,
-         ColumnCount = 2,
+         ColumnCount = 3,
          RowCount    = 1,
-         Padding     = new Padding(12, 10, 12, 12),
+         Margin      = new Padding(0),
       };
       layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LogicalToDeviceUnits(ButtonWidth)));
+      layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LogicalToDeviceUnits(ButtonWidth + 12)));
+      layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LogicalToDeviceUnits(250)));
       layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-      layout.Controls.Add(_lbIwads, 0, 0);
-      layout.Controls.Add(side,     1, 0);
+      layout.Controls.Add(_lbIwads,           0, 0);
+      layout.Controls.Add(side,               1, 0);
+      layout.Controls.Add(BuildDetailPanel(), 2, 0);
 
-      GroupBox box = MakeGroup(Strings.GroupIwad);
-      box.Controls.Add(layout);
-      return box;
+      return MakeSection(Strings.GroupIwad, layout, fill: true);
    }
 
-   /// <summary>Uma linha da lista: fundo de selecao, recuo a esquerda e texto centrado.</summary>
+   /// <summary>Ficha do IWAD selecionado: logo grande, nome e quatro linhas de dado.</summary>
+   private Control BuildDetailPanel()
+   {
+      _detIcon.SizeMode = PictureBoxSizeMode.CenterImage;
+      _detIcon.Size     = new Size(LogicalToDeviceUnits(110), LogicalToDeviceUnits(60));
+      _detIcon.Anchor   = AnchorStyles.None;
+      _detIcon.Margin   = new Padding(0, 0, 0, LogicalToDeviceUnits(6));
+
+      _detName.AutoSize  = true;
+      _detName.Font      = _nameFont;
+      _detName.ForeColor = AccentColor;
+      _detName.Anchor    = AnchorStyles.None;
+      _detName.Margin    = new Padding(0, 0, 0, LogicalToDeviceUnits(10));
+
+      var panel = new TableLayoutPanel
+      {
+         Dock        = DockStyle.Fill,
+         ColumnCount = 2,
+         RowCount    = 7,
+         Margin      = new Padding(0),
+         BackColor   = CardColor,
+      };
+      panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+      panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+      panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      panel.Controls.Add(_detIcon, 0, 0);
+      panel.SetColumnSpan(_detIcon, 2);
+      panel.Controls.Add(_detName, 0, 1);
+      panel.SetColumnSpan(_detName, 2);
+
+      var rows = new (string Key, Label Value)[]
+      {
+         (Strings.DetailFile, _detFile),
+         (Strings.DetailKind, _detKind),
+         (Strings.DetailSize, _detSize),
+         (Strings.DetailMaps, _detMaps),
+      };
+
+      for (int i = 0; i < rows.Length; i++)
+      {
+         Label key = MakeText(rows[i].Key, _boldFont, SystemColors.ControlText);
+         key.Margin = new Padding(0, 0, LogicalToDeviceUnits(6), LogicalToDeviceUnits(4));
+
+         Label value = rows[i].Value;
+         value.AutoSize     = true;
+         value.MaximumSize  = new Size(LogicalToDeviceUnits(150), 0);
+         value.ForeColor    = SystemColors.GrayText;
+         value.Anchor       = AnchorStyles.Left;
+         value.Margin       = new Padding(0, 0, 0, LogicalToDeviceUnits(4));
+
+         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+         panel.Controls.Add(key,   0, i + 2);
+         panel.Controls.Add(value, 1, i + 2);
+      }
+
+      panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+      return panel;
+   }
+
+   /// <summary>Uma linha da lista: logo do jogo, faixa de selecao e o nome.</summary>
    private void OnDrawIwadItem(object? sender, DrawItemEventArgs e)
    {
       if (e.Index < 0)
@@ -762,32 +1205,77 @@ internal sealed class MainForm : Form
       }
 
       bool  picked = (e.State & DrawItemState.Selected) != 0;
-      Color back   = picked ? SystemColors.Highlight     : _lbIwads.BackColor;
-      Color fore   = picked ? SystemColors.HighlightText : _lbIwads.ForeColor;
+      Color back   = picked ? Blend(SystemColors.Window, SystemColors.Highlight, 0.14f) : _lbIwads.BackColor;
+      Color fore   = picked ? AccentColor : _lbIwads.ForeColor;
 
       using (var brush = new SolidBrush(back))
          e.Graphics.FillRectangle(brush, e.Bounds);
 
-      var text = new Rectangle(
-         e.Bounds.Left  + LogicalToDeviceUnits(10), e.Bounds.Top,
-         e.Bounds.Width - LogicalToDeviceUnits(14), e.Bounds.Height);
+      if (picked)
+      {
+         using var bar = new SolidBrush(AccentColor);
+         e.Graphics.FillRectangle(bar, e.Bounds.Left, e.Bounds.Top, LogicalToDeviceUnits(3), e.Bounds.Height);
+      }
 
-      TextRenderer.DrawText(e.Graphics, _lbIwads.Items[e.Index].ToString(), e.Font ?? Font,
-         text, fore,
+      int pad  = LogicalToDeviceUnits(12);
+      int icon = LogicalToDeviceUnits(26);
+
+      Bitmap? logo = null;
+      if (_lbIwads.Items[e.Index] is IwadEntry entry)
+         logo = IwadIcon.Load(entry.Path, icon) ?? _icoWad;
+
+      if (logo is not null)
+      {
+         int ly = e.Bounds.Top + (e.Bounds.Height - logo.Height) / 2;
+         e.Graphics.DrawImage(logo, e.Bounds.Left + pad, ly, logo.Width, logo.Height);
+      }
+
+      var text = new Rectangle(
+         e.Bounds.Left  + pad + icon + LogicalToDeviceUnits(10), e.Bounds.Top,
+         e.Bounds.Width - pad - icon - LogicalToDeviceUnits(18), e.Bounds.Height);
+
+      TextRenderer.DrawText(e.Graphics, _lbIwads.Items[e.Index].ToString(),
+         picked ? (_titleFont ?? Font) : (e.Font ?? Font), text, fore,
          TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis
          | TextFormatFlags.NoPrefix);
-
-      e.DrawFocusRectangle();
    }
 
-   /// <summary>Um PWAD por vez, num dropdown.</summary>
+   /// <summary>Preenche a ficha com o IWAD selecionado agora.</summary>
+   private void UpdateIwadDetails()
+   {
+      if (_lbIwads.SelectedItem is not IwadEntry entry || !File.Exists(entry.Path))
+      {
+         _detIcon.Image = null;
+         _detName.Text  = "";
+         _detFile.Text  = "";
+         _detKind.Text  = "";
+         _detSize.Text  = "";
+         _detMaps.Text  = "";
+         return;
+      }
+
+      _detIcon.Image = IwadIcon.Load(entry.Path, LogicalToDeviceUnits(100)) ?? _icoWad;
+      _detName.Text  = entry.Label;
+      _detFile.Text  = Path.GetFileName(entry.Path);
+      _detKind.Text  = Strings.GroupIwad;
+      _detSize.Text  = $"{new FileInfo(entry.Path).Length / (1024.0 * 1024.0):F1} MB";
+
+      // Inspect le o arquivo inteiro: guarda o resultado por caminho.
+      if (!_mapCounts.TryGetValue(entry.Path, out int maps))
+      {
+         maps = WadValidator.Inspect(entry.Path).MapCount;
+         _mapCounts[entry.Path] = maps;
+      }
+      _detMaps.Text = maps.ToString();
+   }
+
+   // ------------------------------------------------------------------ pwad
+
    private Control BuildPwadGroup()
    {
       _cbPwad.DropDownStyle = ComboBoxStyle.DropDownList;
-      // Anchor no lugar de Dock.Fill: a combo tem altura fixa e assim fica centrada
-      // na vertical em relacao ao botao, que e mais alto.
       _cbPwad.Anchor        = AnchorStyles.Left | AnchorStyles.Right;
-      _cbPwad.Margin        = new Padding(0, 0, Gutter, 0);
+      _cbPwad.Margin        = new Padding(0, 0, LogicalToDeviceUnits(12), 0);
       _cbPwad.ForeColor     = SystemColors.WindowText;
       _cbPwad.MaxDropDownItems = 20;
       _cbPwad.SelectedIndexChanged += (_, _) => ReportPwadCompatibility();
@@ -796,32 +1284,21 @@ internal sealed class MainForm : Form
       browse.Anchor = AnchorStyles.Left;
       browse.Click += OnBrowsePwad;
 
-      // Dock.Top, nao Fill: um TableLayoutPanel com AutoSize e Dock.Fill dentro de um
-      // GroupBox com AutoSize ocupa tambem a faixa do titulo e apaga o rotulo do grupo.
       var layout = new TableLayoutPanel
       {
-         Dock         = DockStyle.Top,
          ColumnCount  = 2,
          RowCount     = 1,
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         Padding      = new Padding(12, 10, 12, 12),
+         Margin       = new Padding(0),
       };
       layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-      // AutoSize, e nao Absolute: uma coluna Absolute aqui faz o GroupBox com
-      // AutoSize parar de pintar a propria legenda (medido, duas vezes). A largura
-      // sai fixa do mesmo jeito, porque quem manda nela e o MinimumSize do botao,
-      // identico ao da coluna do grupo IWAD.
       layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
       layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
       layout.Controls.Add(_cbPwad, 0, 0);
       layout.Controls.Add(browse,  1, 0);
 
-      GroupBox box = MakeGroup(Strings.GroupPwad);
-      box.Dock = DockStyle.Top;
-      box.Controls.Add(layout);
-      FitGroupToContent(box, layout);
-      return box;
+      return MakeSection(Strings.GroupPwad, layout, fill: false);
    }
 
    /// <summary>Uma barra por unidade de disco, visivel so durante a deteccao.</summary>
@@ -918,7 +1395,23 @@ internal sealed class MainForm : Form
 
    private Control BuildFooter()
    {
-      StyleButton(_btnPlay, Strings.Play, _icoPlay, new Padding(Gutter, 0, 0, 0));
+      StyleButton(_btnPlay, Strings.Play, _icoPlayWhite, new Padding(Gutter, 0, 0, 0));
+      // Botao primario: azul cheio com texto branco, sem borda de sistema.
+      _btnPlay.FlatStyle = FlatStyle.Flat;
+      _btnPlay.FlatAppearance.BorderSize = 0;
+      _btnPlay.FlatAppearance.MouseOverBackColor = Blend(AccentColor, Color.White, 0.14f);
+      _btnPlay.FlatAppearance.MouseDownBackColor = Blend(AccentColor, Color.Black, 0.14f);
+      _btnPlay.BackColor = AccentColor;
+      _btnPlay.ForeColor = Color.White;
+      _btnPlay.TextAlign = ContentAlignment.MiddleCenter;
+      // Botao Flat desabilitado mantem o BackColor: sem isto o azul continuaria
+      // cheio com a lista vazia, prometendo um clique que nao faz nada.
+      _btnPlay.EnabledChanged += (_, _) =>
+      {
+         _btnPlay.BackColor = _btnPlay.Enabled
+            ? AccentColor
+            : Blend(AccentColor, SystemColors.Control, 0.62f);
+      };
       _btnPlay.Click += OnPlay;
 
       var quit = StyleButton(new Button(), Strings.Quit, _icoExit, new Padding(0));
@@ -942,6 +1435,7 @@ internal sealed class MainForm : Form
       buttons.Controls.Add(_btnPlay);
       buttons.Controls.Add(quit);
 
+      // O rodape mora fora dos cartoes; o recuo iguala a borda de conteudo deles.
       var row = new TableLayoutPanel
       {
          Dock         = DockStyle.Fill,
@@ -949,9 +1443,7 @@ internal sealed class MainForm : Form
          RowCount     = 1,
          AutoSize     = true,
          AutoSizeMode = AutoSizeMode.GrowAndShrink,
-         // 3 da borda do GroupBox + 12 do padding interno: o "Jogar" fica no mesmo
-         // prumo dos botoes do IWAD/PWAD, e o status no prumo da lista.
-         Margin       = new Padding(GroupInset, 0, GroupInset, 0),
+         Margin       = new Padding(0),
       };
       row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
       row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -1018,7 +1510,7 @@ internal sealed class MainForm : Form
       _cbWeapons.Checked = _settings.WeaponsDisappear;
       _cbJump.Checked    = GameConfig.JumpEnabled(_gameDir);
       _cbFollow.SelectedIndex = Math.Clamp(GameConfig.PipFollow(_gameDir), 0, 1);
-      _cbScores.Checked  = GameConfig.ScoreboardEnabled(_gameDir);
+      _cbFriendly.Checked = GameConfig.FriendlyFire(_gameDir);
 
       // So oferece o PIP se o executavel com o patch estiver do lado.
       bool hasPip = File.Exists(Path.Combine(_gameDir, PipExeName));
@@ -1122,7 +1614,6 @@ internal sealed class MainForm : Form
       _tbBots.Enabled      = _rbCoop.Checked;
       _cbFollow.Enabled    = _cbPip.Enabled && _cbPip.Checked;
       _lblFollow.Enabled   = _cbFollow.Enabled;
-      _lblBotCount.Enabled = _rbCoop.Checked;
       UpdateBotHint();
    }
 
@@ -1132,7 +1623,7 @@ internal sealed class MainForm : Form
    /// </summary>
    private void UpdateBotHint()
    {
-      _lblBotCount.Text = _tbBots.Value.ToString();
+      HighlightBotTick();
 
       // Um modo por vez na caixa: a explicacao do Copiloto so interessa a quem
       // esta no Copiloto. Invisivel em vez de vazio, senao a linha ocupa altura.
@@ -1151,6 +1642,21 @@ internal sealed class MainForm : Form
       _lblBotHint.Text = _tbBots.Value >= MaxBots
          ? Strings.BotHintFull(MaxBots)
          : Strings.BotHintPartial(_tbBots.Value, MaxBots);
+   }
+
+   /// <summary>O numero corrente da regua em azul negrito, o resto em cinza.</summary>
+   private void HighlightBotTick()
+   {
+      for (int i = 0; i < _botTicks.Length; i++)
+      {
+         Label tick = _botTicks[i];
+         if (tick is null)
+            continue;
+
+         bool current = i + 1 == _tbBots.Value;
+         tick.Font      = current ? (_titleFont ?? Font) : (_smallFont ?? Font);
+         tick.ForeColor = current ? AccentColor : SystemColors.GrayText;
+      }
    }
 
    /// <summary>Confere o PWAD escolhido na hora e diz no rodape o que esperar dele.</summary>
@@ -1490,8 +1996,8 @@ internal sealed class MainForm : Form
       string exe = Path.Combine(_gameDir, exeName);
       if (!File.Exists(exe))
       {
-         MessageBox.Show(this, $"Nao encontrei o {GameExeName} em:\n{_gameDir}",
-            "AutoDoom Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+         MessageBox.Show(this, Strings.ExeNotFound(GameExeName, _gameDir),
+            Strings.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
          return;
       }
 
@@ -1529,11 +2035,13 @@ internal sealed class MainForm : Form
          psi.ArgumentList.Add(pwad.Path);
       }
 
-      // Pulo e placar moram na config da engine: escrever agora, com o jogo
-      // fechado, e o unico momento em que a mudanca sobrevive.
+      // Pulo, camera e fogo amigo moram na config da engine: escrever agora, com
+      // o jogo fechado, e o unico momento em que a mudanca sobrevive. O placar
+      // deixou de ser opcao e vai sempre ligado.
       GameConfig.SetJump(_gameDir, _cbJump.Checked);
       GameConfig.SetPipFollow(_gameDir, Math.Max(_cbFollow.SelectedIndex, 0));
-      GameConfig.SetScoreboard(_gameDir, _cbScores.Checked);
+      GameConfig.SetFriendlyFire(_gameDir, _cbFriendly.Checked);
+      GameConfig.SetScoreboard(_gameDir, true);
 
       // O que o AutoDoom ToH.cmd fazia antes de subir o jogo.
       psi.Environment["TIMIDITY_CFG"] = Path.Combine(_gameDir, "timidity.cfg");
@@ -1555,14 +2063,14 @@ internal sealed class MainForm : Form
          if (game.ExitCode != 0)
          {
             MessageBox.Show(this, Strings.ExitedWithCode(game.ExitCode),
-               "AutoDoom Launcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+               Strings.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
          }
       }
       catch (Win32Exception ex)
       {
          Show();
-         MessageBox.Show(this, $"Nao consegui iniciar o jogo:\n{ex.Message}",
-            "AutoDoom Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+         MessageBox.Show(this, Strings.LaunchFailed(ex.Message),
+            Strings.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
       }
    }
 }

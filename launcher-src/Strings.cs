@@ -71,6 +71,40 @@ internal static class Strings
       "Liberar o &pulo (a engine vem com ele desativado)",
       "Enable &jumping (the engine ships with it disabled)");
 
+   public static string FriendlyFireOption => Pick(
+      "&Fogo amigo",
+      "&Friendly fire");
+
+   public static string FriendlyFireHint => Pick(
+      "Jogadores se ferem entre si, como no Doom classico.",
+      "Players can hurt each other, like classic Doom.");
+
+   // Rotulos do painel de detalhes do IWAD
+   public static string DetailFile    => Pick("Arquivo:", "File:");
+   public static string DetailKind    => Pick("Tipo:", "Type:");
+   public static string DetailSize    => Pick("Tamanho:", "Size:");
+   public static string DetailMaps    => Pick("Mapas:", "Maps:");
+
+   public static string PipOptionShort => Pick(
+      "Ver a tela dos bots num quadrinho",
+      "Show the bots' view in a corner box");
+
+   public static string PipOptionHint => Pick(
+      "Usa o autodoom_pip.exe para exibir as telas dos bots.",
+      "Uses autodoom_pip.exe to draw the bots' views.");
+
+   public static string WeaponsOptionShort => Pick(
+      "Armas somem ao pegar, como no single player",
+      "Weapons disappear when picked up, like single player");
+
+   public static string JumpOptionShort => Pick(
+      "Liberar o pulo",
+      "Enable jumping");
+
+   public static string JumpHint => Pick(
+      "A engine vem com o pulo desativado.",
+      "The engine ships with jumping disabled.");
+
    public static string ScoreboardOption => Pick(
       "&Placar de abates ao segurar F",
       "&Kill scoreboard while holding F");
@@ -82,6 +116,20 @@ internal static class Strings
       "&Copilot: the bot plays and hands control back when you move");
 
    public static string ModeCoop => Pick("C&oop: voce joga com", "C&oop: you play with");
+
+   // O v2 quebra a linha do modo em rotulo (negrito) e descricao (normal), entao
+   // cada metade precisa existir separada. O mnemonico mora no rotulo.
+   public static string ModeCopilotName => Pick("&Copiloto:", "&Copilot:");
+
+   public static string ModeCopilotDesc => Pick(
+      "o bot joga e devolve o controle quando voce mexe",
+      "the bot plays and hands control back when you move");
+
+   public static string ModeCoopName => Pick("C&oop:", "C&oop:");
+
+   public static string ModeCoopDesc => Pick("voce joga com", "you play with");
+
+   public static string CameraCardTitle => Pick("A camera segue:", "The camera follows:");
 
    public static string BotsWord => "bots";
 

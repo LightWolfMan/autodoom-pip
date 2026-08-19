@@ -40,8 +40,12 @@ loose ends of running AutoDoom together.
 
 - **Picture-in-picture** — one to three corner boxes with other players' views, rendered in the
   same frame. Off by default.
-- **Follows the leader** — with a single box it tracks whoever has the most kills. `F12` borrows
-  the box for ten seconds, then it goes back on its own.
+- **Follows the leader** — with a single box it tracks whoever has the most kills, or whoever is
+  closest to the exit, your choice. `F12` borrows the box for ten seconds, then it goes back.
+- **Coloured frame and micro HUD** — each box is framed in that player's own colour, taken from
+  the game's translation tables, and flashes white when they take a hit. Health and ammo are
+  printed under the box, in the same colour.
+- **Friendly fire switch** — co-op in Doom lets players hurt each other; you can turn that off.
 - **Launcher** — IWAD and PWAD pickers, Copilot and Co-op modes, bot count, and a WAD finder
   that reads the NTFS journal instead of walking the disk.
 - **Nobody leaves without asking** — a bot that reaches the exit switch stops there and asks
@@ -121,6 +125,7 @@ Exit approval has its own switches:
 | `bot_exitvote` | Bots must ask before taking the exit | `1` |
 | `bot_exitvote_delay` | Seconds to wait after a refusal | `60` |
 | `bot_exitvote_log` | Write what happened to `vote.log` | `0` |
+| `bot_friendlyfire` | Players can hurt each other in co-op | `1` |
 
 `vote_yes` and `vote_no` answer from the console, if you would rather bind keys than use the
 prompt.
@@ -225,8 +230,12 @@ launcher que amarra as pontas soltas de rodar o AutoDoom.
 
 - **Picture-in-picture** — de um a três quadrinhos com a visão de outros jogadores, desenhados no
   mesmo quadro. Vem desligado.
-- **Segue o líder** — com um quadrinho só, ele acompanha quem mais matou. O `F12` empresta o
-  quadrinho por dez segundos e depois ele volta sozinho.
+- **Segue o líder** — com um quadrinho só, ele acompanha quem mais matou, ou quem está mais
+  perto da saída, você escolhe. O `F12` empresta o quadrinho por dez segundos e ele volta.
+- **Moldura colorida e micro HUD** — cada quadrinho é emoldurado na cor daquele jogador, tirada
+  das tabelas de tradução do próprio jogo, e pisca de branco quando ele leva dano. Vida e
+  munição saem embaixo do quadro, na mesma cor.
+- **Fogo amigo** — no coop do Doom os jogadores se ferem; dá para desligar.
 - **Launcher** — escolha de IWAD e PWAD, modos Copiloto e Coop, número de bots, e um detector de
   WADs que lê o journal do NTFS em vez de varrer o disco.
 - **Ninguém sai sem perguntar** — o bot que chega no botão da saída para ali e pergunta, com o
@@ -299,6 +308,7 @@ A autorização de saída tem as suas:
 | `bot_exitvote` | O bot precisa pedir antes de acionar a saída | `1` |
 | `bot_exitvote_delay` | Segundos de espera depois de um "não" | `60` |
 | `bot_exitvote_log` | Grava o que aconteceu em `vote.log` | `0` |
+| `bot_friendlyfire` | Jogadores se ferem no coop | `1` |
 
 `vote_yes` e `vote_no` respondem pelo console, se você preferir teclas ao diálogo.
 

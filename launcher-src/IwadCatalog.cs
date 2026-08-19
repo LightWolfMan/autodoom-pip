@@ -92,7 +92,35 @@ internal static class IwadCatalog
       foreach (string file in extraFiles.Where(File.Exists))
          Add(FromFile(file));
 
-      return byGame.Values.OrderBy(e => e.Label, StringComparer.CurrentCultureIgnoreCase).ToList();
+      // Ordem de lancamento, nao alfabetica: e assim que a serie e lembrada, e
+      // deixa os Freedoom (que sao recriacoes livres) no fim.
+      return byGame.Values.OrderBy(e => ReleaseOrder(e.Label))
+                          .ThenBy(e => e.Label, StringComparer.CurrentCultureIgnoreCase)
+                          .ToList();
+   }
+
+   /// <summary>
+   /// Cronologia: Doom (1993), Doom II (1994), TNT e Plutonia (1996), Heretic
+   /// (1994) entra depois por ser outro jogo, e os Freedoom fecham a lista.
+   /// </summary>
+   private static readonly string[] ReleaseSequence =
+   [
+      "The Ultimate DOOM", "DOOM (Registered)", "DOOM (Shareware)",
+      "DOOM II", "DOOM II (BFG Edition)", "DOOM II (frances)",
+      "Final DOOM: TNT - Evilution", "Final DOOM: The Plutonia Experiment",
+      "Heretic", "Heretic: Shadow of the Serpent Riders", "Heretic (Registered)",
+      "Heretic (Shareware)", "HACX", "Rekkr",
+      "Freedoom (Ultimate Doom)", "Freedoom (Doom II)", "FreeDM",
+   ];
+
+   private static int ReleaseOrder(string label)
+   {
+      for (int i = 0; i < ReleaseSequence.Length; i++)
+      {
+         if (label.StartsWith(ReleaseSequence[i], StringComparison.OrdinalIgnoreCase))
+            return i;
+      }
+      return ReleaseSequence.Length;   // desconhecido vai para o fim
    }
 
    /// <summary>Pastas varridas por padrao: a do jogo e as bibliotecas vizinhas.</summary>
