@@ -250,6 +250,9 @@ a player instead.
 
 ## Contributing
 
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md): it carries the state of the work, the
+decisions already made and the traps that already cost time.
+
 Issues and pull requests are welcome. The engine change is offered upstream at
 [ioan-chera/AutoDoom](https://github.com/ioan-chera/AutoDoom); the modified source lives in
 [LightWolfMan/AutoDoom, branch `pip-view`](https://github.com/LightWolfMan/AutoDoom/tree/pip-view).
